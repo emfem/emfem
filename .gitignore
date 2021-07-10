@@ -1,0 +1,11 @@
+build*
+model*
+/emfem
+scripts/
+examples/
+
+*.cfg
+*.log
+*.vtk
+*.vtu
+*.dat

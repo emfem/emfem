@@ -1,0 +1,98 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+
+PROJECT(emfem C CXX Fortran)
+
+SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+SET(CMAKE_CXX_STANDARD 11)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+FIND_PACKAGE(MPI REQUIRED)
+
+IF(NOT TETGEN_DIR)
+  MESSAGE(FATAL_ERROR "\n"
+    "*** emfem need the Tetgen library ***\n"
+    "Please pass flags -DTETGEN_DIR=/tetgen/install/dir to cmake.\n"
+    )
+ELSE()
+  FIND_PATH(TETGEN_INCLUDE_DIR tetgen.h HINTS ${TETGEN_DIR} ${TETGEN_DIR}/include)
+  FIND_LIBRARY(TETGEN_LIBRARY tet HINTS ${TETGEN_DIR} ${TETGEN_DIR}/lib)
+
+  IF(TETGEN_INCLUDE_DIR MATCHES "-NOTFOUND" OR TETGEN_LIBRARY MATCHES "-NOTFOUND")
+    MESSAGE(FATAL_ERROR "\n*** Could not find Tetgen. ***\n")
+  ENDIF()
+ENDIF()
+
+IF(NOT NANOFLANN_DIR)
+  MESSAGE(FATAL_ERROR "\n"
+    "*** emfem need the nanoflann library ***\n"
+    "Please pass flags -DNANOFLANN_DIR=/nanoflann/install/dir to cmake.\n"
+    )
+ELSE()
+  FIND_PATH(NANOFLANN_INCLUDE_DIR nanoflann.hpp HINTS ${NANOFLANN_DIR} ${NANOFLANN_DIR}/include)
+
+  IF(NANOFLANN_INCLUDE_DIR MATCHES "-NOTFOUND" OR NANOFLANN_LIBRARY MATCHES "-NOTFOUND")
+    MESSAGE(FATAL_ERROR "\n*** Could not find nanoflann. ***\n")
+  ENDIF()
+ENDIF()
+
+IF(NOT EIGEN_DIR)
+  MESSAGE(FATAL_ERROR "\n"
+    "*** emfem need eigen library ***\n"
+    "Please pass flags -DEIGEN_DIR=/eigen/install/dir to cmake.\n"
+    )
+ELSE()
+  FIND_PATH(EIGEN_INCLUDE_DIR Eigen/Eigen HINTS ${EIGEN_DIR} ${EIGEN_DIR}/include ${EIGEN_DIR}/include/eigen3)
+
+  IF(EIGEN_INCLUDE_DIR MATCHES "-NOTFOUND")
+    MESSAGE(FATAL_ERROR "\n*** Could not find Eigen. ***\n")
+  ENDIF()
+ENDIF()
+
+IF(NOT METIS_DIR)
+  MESSAGE(FATAL_ERROR "\n"
+    "*** emfem need metis library ***\n"
+    "Please pass flags -DMETIS_DIR=/metis/install/dir to cmake.\n"
+    )
+ELSE()
+  FIND_PATH(METIS_INCLUDE_DIR metis.h HINTS ${METIS_DIR} ${METIS_DIR}/include)
+  FIND_LIBRARY(METIS_LIBRARY metis HINTS ${METIS_DIR} ${METIS_DIR}/lib)
+
+  IF(METIS_INCLUDE_DIR MATCHES "-NOTFOUND" OR METIS_LIBRARY MATCHES "-NOTFOUND")
+    MESSAGE(FATAL_ERROR "\n*** Could not find Metis. ***\n")
+  ENDIF()
+ENDIF()
+
+IF(NOT PETSC_DIR)
+  MESSAGE(FATAL_ERROR "\n"
+    "*** emfem need PETSc library ***\n"
+    "Please pass flags -DPETSC_DIR=/petsc/install/dir and -DPETSC_ARCH=petsc-arch to cmake.\n"
+    )
+ELSE()
+  FIND_PATH(PETSC_INCLUDE_DIR_ARCH petscconf.h
+    HINTS ${PETSC_DIR} ${PETSC_DIR}/${PETSC_ARCH}
+    PATH_SUFFIXES petsc include include/petsc
+    )
+  FIND_PATH(PETSC_INCLUDE_DIR_COMMON petscversion.h
+    HINTS ${PETSC_DIR} ${PETSC_DIR}/${PETSC_ARCH}
+    PATH_SUFFIXES petsc include include/petsc
+    )
+  FIND_LIBRARY(PETSC_LIBRARY
+    NAMES petsc libpetsc
+    HINTS ${PETSC_DIR} ${PETSC_DIR}/${PETSC_ARCH}
+    PATH_SUFFIXES lib lib64
+    )
+
+  IF(PETSC_INCLUDE_DIR_ARCH MATCHES "-NOTFOUND" OR PETSC_INCLUDE_DIR_COMMON MATCHES "-NOTFOUND" OR PETSC_LIBRARY MATCHES "-NOTFOUND")
+    MESSAGE(FATAL_ERROR "\n*** Could not find PETSc. ***\n")
+  ENDIF()
+  SET(PETSC_INCLUDE_DIR ${PETSC_INCLUDE_DIR_ARCH} ${PETSC_INCLUDE_DIR_COMMON})
+  LIST(REMOVE_DUPLICATES PETSC_INCLUDE_DIR)
+ENDIF()
+
+INCLUDE_DIRECTORIES(${MPI_C_INCLUDE_PATH} ${PETSC_INCLUDE_DIR} ${TETGEN_INCLUDE_DIR}
+                    ${NANOFLANN_INCLUDE_DIR} ${EIGEN_INCLUDE_DIR} ${METIS_INCLUDE_DIR})
+
+ADD_DEFINITIONS(-DTETLIBRARY)
+
+ADD_SUBDIRECTORY(src)
