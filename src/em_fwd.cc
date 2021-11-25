@@ -641,7 +641,7 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
   }
   cell = TetAccessor(ctx->mesh.get(), t);
 
-  if (!cell.is_locally_owned()) {
+  if (cell.is_locally_owned()) {
     fv.reinit(cell);
     fv.get_cell_dof_indices(dof_indices);
 
