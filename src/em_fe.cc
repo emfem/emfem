@@ -75,7 +75,7 @@ void transform_face_quadrature_points(const TetAccessor &tet, int f,
     }
     qpoints[i] = (jac * natual_coords).tail(3);
 
-    jxw[i] = 2.0 * s * weights[i];
+    jxw[i] = s * weights[i];
   }
 }
 
@@ -149,7 +149,7 @@ void transform_cell_quadrature_points(const TetAccessor &tet, const std::vector<
     p = ref_qpoints[i];
     qpoints[i] = (jac * Eigen::Vector4d(1 - p[0] - p[1] - p[2], p[0], p[1], p[2])).tail(3);
 
-    jxw[i] = 3.0 * det_jac * weights[i];
+    jxw[i] = det_jac * weights[i];
   }
 }
 
