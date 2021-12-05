@@ -9,6 +9,8 @@ struct EMContext;
 
 PetscErrorCode get_cell_attribute(EMContext *, const TetAccessor &, Tensor &);
 
+PetscErrorCode extract_locally_owned_vertices(EMContext *);
+
 PetscErrorCode extract_locally_owned_edges(EMContext *);
 PetscErrorCode extract_locally_relevant_edges(EMContext *);
 

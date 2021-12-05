@@ -279,11 +279,12 @@ PetscErrorCode setup_ams(EMContext *ctx) {
   }
   row_ptr[n_local_edges] = n_local_edges * 2;
 
-  ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, n_local_edges, PETSC_DECIDE, n_edges, n_vertices, &row_ptr[0], &col_idx[0], &vals[0], &ctx->G); CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)(ctx->G), "G_"); CHKERRQ(ierr);
-
-  ierr = MatGetOwnershipRangeColumn(ctx->G, &begin, &end); CHKERRQ(ierr);
+  begin = ctx->local_vertices.first;
+  end = ctx->local_vertices.second;
   n_local_vertices = end - begin;
+
+  ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, n_local_edges, n_local_vertices, n_edges, n_vertices, &row_ptr[0], &col_idx[0], &vals[0], &ctx->G); CHKERRQ(ierr);
+  ierr = PetscObjectSetName((PetscObject)(ctx->G), "G_"); CHKERRQ(ierr);
 
   ctx->v_coords.resize(n_local_vertices * 3);
 

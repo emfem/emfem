@@ -29,7 +29,7 @@ struct EMContext {
   std::shared_ptr<Mesh> original_mesh, mesh;
 
   std::vector<int> relevant_edges;
-  std::pair<int, int> local_edges;
+  std::pair<int, int> local_vertices, local_edges;
 
   std::set<int> bdr_cells;
 

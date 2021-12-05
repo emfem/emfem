@@ -13,13 +13,12 @@ void Mesh::create(const std::vector<Point> &vertices, const Eigen::MatrixXi &tet
   this->tetrahedra_ = tets;
   this->tet_attributes_ = tet_attributes;
 
+  build_vertex_info();
   build_edge_info();
   build_neighbor_info();
   build_boundary_info();
-
-  init_kd_tree();
-
   partition();
+  init_kd_tree();
 }
 
 void Mesh::create_from_tetgen(tetgenio *in) {
@@ -242,7 +241,30 @@ void Mesh::partition() {
   std::copy(part.begin(), part.end(), subdomain_.begin());
 
   extract_ghost_cells();
-  compute_new_edge_indices();
+  compute_new_vertex_indices_();
+  compute_new_edge_indices_();
+}
+
+void Mesh::get_vertex_owners(std::vector<int> &owners) {
+  int t, v;
+  bool coin_flip;
+
+  owners.resize(n_vertices());
+  std::fill(owners.begin(), owners.end(), -1);
+
+  coin_flip = true;
+  for (t = 0; t < n_tets(); ++t) {
+    for (v = 0; v < VERTICES_PER_TET; ++v) {
+      if (owners[new_vertex_indices_[tetrahedra_(t, v)]] < 0) {
+        owners[new_vertex_indices_[tetrahedra_(t, v)]] = subdomain_[t];
+      } else {
+        if (coin_flip) {
+          owners[new_vertex_indices_[tetrahedra_(t, v)]] = subdomain_[t];
+        }
+        coin_flip = !coin_flip;
+      }
+    }
+  }
 }
 
 void Mesh::get_edge_owners(std::vector<int> &owners) {
@@ -255,11 +277,11 @@ void Mesh::get_edge_owners(std::vector<int> &owners) {
   coin_flip = true;
   for (t = 0; t < n_tets(); ++t) {
     for (e = 0; e < EDGES_PER_TET; ++e) {
-      if (owners[edge_number_[tet_edges_(t, e)]] < 0) {
-        owners[edge_number_[tet_edges_(t, e)]] = subdomain_[t];
+      if (owners[new_edge_indices_[tet_edges_(t, e)]] < 0) {
+        owners[new_edge_indices_[tet_edges_(t, e)]] = subdomain_[t];
       } else {
-        if (coin_flip == true) {
-          owners[edge_number_[tet_edges_(t, e)]] = subdomain_[t];
+        if (coin_flip) {
+          owners[new_edge_indices_[tet_edges_(t, e)]] = subdomain_[t];
         }
         coin_flip = !coin_flip;
       }
@@ -267,7 +289,24 @@ void Mesh::get_edge_owners(std::vector<int> &owners) {
   }
 }
 
-void Mesh::compute_new_edge_indices() {
+void Mesh::compute_new_vertex_indices_() {
+  std::vector<int> owners;
+  int v, subdomain, next_free_index;
+
+  get_vertex_owners(owners);
+
+  next_free_index = 0;
+
+  for (subdomain = 0; subdomain < comm_size_; ++subdomain) {
+    for (v = 0; v < n_vertices(); ++v) {
+      if (owners[v] == subdomain) {
+        new_vertex_indices_[v] = next_free_index++;
+      }
+    }
+  }
+}
+
+void Mesh::compute_new_edge_indices_() {
   std::vector<int> owners;
   int e, subdomain, next_free_index;
 
@@ -278,7 +317,7 @@ void Mesh::compute_new_edge_indices() {
   for (subdomain = 0; subdomain < comm_size_; ++subdomain) {
     for (e = 0; e < n_edges(); ++e) {
       if (owners[e] == subdomain) {
-        edge_number_[e] = next_free_index++;
+        new_edge_indices_[e] = next_free_index++;
       }
     }
   }
@@ -309,6 +348,15 @@ void Mesh::extract_ghost_cells() {
         }
       }
     }
+  }
+}
+
+void Mesh::build_vertex_info() {
+  int v;
+
+  new_vertex_indices_.resize(n_vertices());
+  for (v = 0; v < n_vertices(); ++v) {
+    new_vertex_indices_[v] = v;
   }
 }
 
@@ -387,9 +435,9 @@ void Mesh::build_edge_info() {
     ++ne;
   }
 
-  edge_number_.resize(n_edges());
+  new_edge_indices_.resize(n_edges());
   for (e = 0; e < n_edges(); ++e) {
-    edge_number_[e] = e;
+    new_edge_indices_[e] = e;
   }
 }
 
@@ -491,18 +539,18 @@ void Mesh::init_kd_tree() {
   vertex_to_tet_.resize(n_vertices());
   for (i = 0; i < n_tets(); ++i) {
     for (j = 0; j < VERTICES_PER_TET; ++j) {
-      vertex_to_tet_[tetrahedra_(i, j)] = i;
+      vertex_to_tet_[new_vertex_indices_[tetrahedra_(i, j)]] = i;
     }
   }
 }
 
-int Mesh::find_closest_vertex(const Point &p) {
+std::tuple<Point, int> Mesh::find_closest_vertex(const Point &p) {
   size_t idx;
   double dist;
 
   kd_index_->knnSearch(&p[0], 1, &idx, &dist);
 
-  return idx;
+  return std::make_tuple(vertices_[idx], new_vertex_indices_[idx]);
 }
 
 int Mesh::find_cell_around_point(const Point &p) {
@@ -514,7 +562,7 @@ int Mesh::find_cell_around_point(const Point &p) {
   touched_tets.resize(n_tets());
   std::fill(touched_tets.begin(), touched_tets.end(), false);
 
-  q.push(vertex_to_tet_[find_closest_vertex(p)]);
+  q.push(vertex_to_tet_[std::get<1>(find_closest_vertex(p))]);
 
   t = -1;
   while (!q.empty()) {

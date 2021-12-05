@@ -42,12 +42,9 @@ public:
   int n_tets() const { return tetrahedra_.rows(); }
   int n_edges() const { return edges_.rows(); }
 
-  Point vertex(int v) const {
-    assert(v < (int)vertices_.size());
-    return vertices_[v];
-  }
-
   void refine_tetgen(const std::vector<bool> &);
+
+  void get_vertex_owners(std::vector<int> &);
 
   void get_edge_owners(std::vector<int> &);
 
@@ -71,15 +68,17 @@ public:
   template <typename BBOX> bool kdtree_get_bbox(BBOX &) const { return false; }
 
   void init_kd_tree();
-  int find_closest_vertex(const Point &);
+  std::tuple<Point, int> find_closest_vertex(const Point &);
   int find_cell_around_point(const Point &);
 
 private:
   void partition();
   void extract_ghost_cells();
-  void compute_new_edge_indices();
+  void compute_new_vertex_indices_();
+  void compute_new_edge_indices_();
 
 private:
+  void build_vertex_info();
   void build_edge_info();
   void build_neighbor_info();
   void build_boundary_info();
@@ -100,7 +99,7 @@ private:
   Eigen::MatrixXi tet_neighbors_, tet_neighbor_of_neighbor_;
 
   Eigen::MatrixXi edges_, tet_edges_;
-  std::vector<int> edge_number_;
+  std::vector<int> new_edge_indices_, new_vertex_indices_;
   std::vector<bool> edge_bdr_marker_;
 
   std::vector<int> vertex_to_tet_;
@@ -123,7 +122,7 @@ public:
 
   int vertex_index(int v) const {
     assert(v < VERTICES_PER_TET);
-    return m_->tetrahedra_(tidx_, v);
+    return m_->new_vertex_indices_[m_->tetrahedra_(tidx_, v)];
   }
 
   bool vertex_on_boundary(int v) const {
@@ -133,7 +132,7 @@ public:
 
   int edge_index(int e) const {
     assert(e < EDGES_PER_TET);
-    return m_->edge_number_[m_->tet_edges_(tidx_, e)];
+    return m_->new_edge_indices_[m_->tet_edges_(tidx_, e)];
   }
 
   int edge_end_point(int e, int ep) const {

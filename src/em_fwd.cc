@@ -86,7 +86,7 @@ PetscErrorCode generate_layered_model(EMContext *ctx, const Point &tl, const Poi
   fp = p;
 
   while (fp[2] < br[2]) {
-    v = ctx->original_mesh->find_closest_vertex(fp);
+    v = std::get<1>(ctx->original_mesh->find_closest_vertex(fp));
     t = ctx->original_mesh->find_cell_around_point(Point(fp[0], fp[1], fp[2] + EPS));
 
     cell = TetAccessor(ctx->original_mesh.get(), t);
@@ -140,10 +140,10 @@ PetscErrorCode update_background_model(EMContext *ctx) {
   PetscFunctionBegin;
 
   p[0] = p[1] = p[2] = -1.0E+15;
-  top_left = ctx->original_mesh->vertex(ctx->original_mesh->find_closest_vertex(p));
+  top_left = std::get<0>(ctx->original_mesh->find_closest_vertex(p));
 
   p[0] = p[1] = p[2] = 1.0E+15;
-  bottom_right = ctx->original_mesh->vertex(ctx->original_mesh->find_closest_vertex(p));
+  bottom_right = std::get<0>(ctx->original_mesh->find_closest_vertex(p));
 
   ctx->top_corners[0] = Point(top_left[0], top_left[1], top_left[2]);
   ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[0], ctx->ztop[0], ctx->lsig[0]); CHKERRQ(ierr);
@@ -156,6 +156,36 @@ PetscErrorCode update_background_model(EMContext *ctx) {
 
   ctx->top_corners[3] = Point(top_left[0], bottom_right[1], top_left[2]);
   ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[3], ctx->ztop[3], ctx->lsig[3]); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode extract_locally_owned_vertices(EMContext *ctx) {
+  int v, begin, end;
+  std::vector<int> owners;
+
+  PetscFunctionBegin;
+
+  ctx->mesh->get_vertex_owners(owners);
+
+  begin = std::numeric_limits<int>::max();
+  end = std::numeric_limits<int>::min();
+
+  for (v = 0; v < ctx->mesh->n_vertices(); ++v) {
+    if (owners[v] == ctx->group_rank) {
+      begin = std::min(begin, v);
+      end = std::max(end, v);
+    }
+  }
+
+  if (begin > end) {
+    begin = end = -1;
+  } else {
+    end += 1;
+  }
+
+  ctx->local_vertices.first = begin;
+  ctx->local_vertices.second = end;
 
   PetscFunctionReturn(0);
 }
@@ -277,6 +307,7 @@ PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
 
   LogEventHelper leh(ctx->CreateLS);
 
+  ierr = extract_locally_owned_vertices(ctx); CHKERRQ(ierr);
   ierr = extract_locally_owned_edges(ctx); CHKERRQ(ierr);
   ierr = extract_locally_relevant_edges(ctx); CHKERRQ(ierr);
   ierr = make_sparsity_patterns(ctx, rptr, cidx); CHKERRQ(ierr);
