@@ -253,8 +253,8 @@ PetscErrorCode extract_locally_relevant_edges(EMContext *ctx) {
 PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rptr,
                                       std::vector<PetscInt> &cidx) {
   TetAccessor cell;
-  int t, i, j, nrow, nnz, eidx, begin, end;
-  std::vector<std::set<int> > nnz_patterns;
+  int t, i, j, nrow, nnz, eidx, begin, end, indices[EDGES_PER_TET];
+  std::vector<std::vector<int>> nnz_patterns;
 
   PetscFunctionBegin;
 
@@ -266,13 +266,17 @@ PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rpt
 
   for (t = 0; t < ctx->mesh->n_tets(); ++t) {
     cell = TetAccessor(ctx->mesh.get(), t);
-    if (cell.is_locally_owned() || cell.is_ghost()) {
-      for (i = 0; i < EDGES_PER_TET; ++i) {
-        eidx = cell.edge_index(i);
-        if (eidx >= begin && eidx < end) {
-          for (j = 0; j < EDGES_PER_TET; ++j) {
-            nnz_patterns[eidx - begin].insert(cell.edge_index(j));
-          }
+    if (!(cell.is_locally_owned() || cell.is_ghost())) {
+      continue;
+    }
+    for (i = 0; i < EDGES_PER_TET; ++i) {
+      indices[i] = cell.edge_index(i);
+    }
+    for (i = 0; i < EDGES_PER_TET; ++i) {
+      eidx = indices[i];
+      if (eidx >= begin && eidx < end) {
+        for (j = 0; j < EDGES_PER_TET; ++j) {
+          nnz_patterns[eidx - begin].push_back(indices[j]);
         }
       }
     }
@@ -280,6 +284,10 @@ PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rpt
 
   nnz = 0;
   for (i = begin; i < end; ++i) {
+    std::sort(nnz_patterns[i - begin].begin(), nnz_patterns[i - begin].end());
+    nnz_patterns[i - begin].resize(
+        std::distance(nnz_patterns[i - begin].begin(),
+                      std::unique(nnz_patterns[i - begin].begin(), nnz_patterns[i - begin].end())));
     nnz += nnz_patterns[i - begin].size();
   }
 
@@ -290,9 +298,11 @@ PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rpt
   for (i = begin; i < end; ++i) {
     rptr[i - begin] = nnz;
     std::copy(nnz_patterns[i - begin].begin(), nnz_patterns[i - begin].end(), cidx.begin() + nnz);
-    nnz += std::distance(nnz_patterns[i - begin].begin(), nnz_patterns[i - begin].end());
+    nnz += nnz_patterns[i - begin].size();
   }
   rptr[i - begin] = nnz;
+
+  nnz_patterns.clear();
 
   PetscFunctionReturn(0);
 }
@@ -300,7 +310,6 @@ PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rpt
 PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
   int nrow;
   PetscErrorCode ierr;
-  std::set<int> ghost_cells;
   std::vector<PetscInt> rptr, cidx;
 
   PetscFunctionBegin;
