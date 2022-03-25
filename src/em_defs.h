@@ -44,6 +44,8 @@ enum InnerPCType { Mixed = 0, AMS = 1, Direct = 2 };
 
 enum DirectSolverType { MUMPS = 0, SUPERLUDIST = 1 };
 
+enum MeshFormat { MDL = 0, MESH = 1 };
+
 enum ObsType {
   F_EX_RI = 111,
   F_EY_RI = 121,

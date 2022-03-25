@@ -5,8 +5,9 @@
 
 struct EMContext;
 
-PetscErrorCode read_mdl(const char *, EMContext *);
-PetscErrorCode read_emd(const char *, EMContext *);
+PetscErrorCode read_mdl(EMContext *);
+PetscErrorCode read_mesh(EMContext *);
+PetscErrorCode read_emd(EMContext *);
 
 PetscErrorCode save_mesh(EMContext *, const char *, int);
 PetscErrorCode save_rsp(EMContext *, const char *);

@@ -2,7 +2,8 @@
 #define _MESH_H_
 
 #include "em_defs.h"
-#include "tetgen.h"
+
+#include <tetgen.h>
 
 #include <mpi.h>
 #include <nanoflann.hpp>
@@ -33,14 +34,13 @@ public:
     }
   }
 
-  void create(const std::vector<Point> &, const Eigen::MatrixXi &, const std::vector<int> &);
   void create_from_tetgen(tetgenio *);
 
   void copy(const Mesh &);
 
-  int n_vertices() const { return vertices_.size(); }
-  int n_tets() const { return tetrahedra_.rows(); }
-  int n_edges() const { return edges_.rows(); }
+  int n_vertices() const { return tio_->numberofpoints; }
+  int n_tets() const { return tio_->numberoftetrahedra; }
+  int n_edges() const { return tio_->numberofedges; }
 
   void refine_tetgen(const std::vector<bool> &);
 
@@ -54,22 +54,40 @@ public:
   typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<double, Mesh>, Mesh, 3>
       KDTree;
 
-  size_t kdtree_get_point_count() const { return (size_t)n_vertices(); }
+  size_t kdtree_get_point_count() const { return (size_t)tio_->numberofpoints; }
 
   double kdtree_distance(const double *p, const size_t idx, size_t) const {
-    const double *ptr = &vertices_[idx][0];
+    const double *ptr = &vertex(idx)[0];
 
     return std::sqrt((p[0] - ptr[0]) * (p[0] - ptr[0]) + (p[1] - ptr[1]) * (p[1] - ptr[1]) +
                      (p[2] - ptr[2]) * (p[2] - ptr[2]));
   }
 
-  double kdtree_get_pt(const size_t idx, int dim) const { return vertices_[idx][dim]; }
+  double kdtree_get_pt(const size_t idx, int dim) const { return vertex(idx)[dim]; }
 
   template <typename BBOX> bool kdtree_get_bbox(BBOX &) const { return false; }
 
   void init_kd_tree();
   std::tuple<Point, int> find_closest_vertex(const Point &);
   int find_cell_around_point(const Point &);
+
+private:
+  Point vertex(int v) const {
+    return Point(tio_->pointlist[v * 3 + 0], tio_->pointlist[v * 3 + 1],
+                 tio_->pointlist[v * 3 + 2]);
+  }
+
+  int tet2vertex(int t, int v) const { return tio_->tetrahedronlist[t * VERTICES_PER_TET + v]; };
+
+  int tet2edge(int t, int e) const { return tio_->tet2edgelist[t * EDGES_PER_TET + e]; }
+
+  int edge2vertex(int e, int v) const { return tio_->edgelist[e * VERTICES_PER_EDGE + v]; }
+
+  int attribute(int t) const { return (int)tio_->tetrahedronattributelist[t]; }
+
+  int neighbor(int t, int n) const { return tio_->neighborlist[t * TRIANGLES_PER_TET + n]; }
+
+  int neighbor_of_neighbor(int t, int n) const { return tet_non_[t * TRIANGLES_PER_TET + n]; }
 
 private:
   void partition();
@@ -89,20 +107,9 @@ private:
 
   tetgenio *tio_;
 
-  std::vector<Point> vertices_;
-  std::vector<bool> vertex_bdr_marker_;
+  std::vector<bool> vertex_bdr_marker_, edge_bdr_marker_, ghost_flag_;
+  std::vector<int> tet_non_, subdomain_, new_edge_indices_, new_vertex_indices_, vertex_to_tet_;
 
-  Eigen::MatrixXi tetrahedra_;
-  std::vector<int> tet_attributes_, subdomain_;
-  std::vector<bool> ghost_flag_;
-
-  Eigen::MatrixXi tet_neighbors_, tet_neighbor_of_neighbor_;
-
-  Eigen::MatrixXi edges_, tet_edges_;
-  std::vector<int> new_edge_indices_, new_vertex_indices_;
-  std::vector<bool> edge_bdr_marker_;
-
-  std::vector<int> vertex_to_tet_;
   std::shared_ptr<KDTree> kd_index_;
 
   friend class TetAccessor;
@@ -117,22 +124,22 @@ public:
 
   Point vertex(int v) const {
     assert(v < VERTICES_PER_TET);
-    return m_->vertices_[m_->tetrahedra_(tidx_, v)];
+    return m_->vertex(m_->tet2vertex(tidx_, v));
   }
 
   int vertex_index(int v) const {
     assert(v < VERTICES_PER_TET);
-    return m_->new_vertex_indices_[m_->tetrahedra_(tidx_, v)];
+    return m_->new_vertex_indices_[m_->tet2vertex(tidx_, v)];
   }
 
   bool vertex_on_boundary(int v) const {
     assert(v < VERTICES_PER_TET);
-    return m_->vertex_bdr_marker_[m_->tetrahedra_(tidx_, v)];
+    return m_->vertex_bdr_marker_[m_->tet2vertex(tidx_, v)];
   }
 
   int edge_index(int e) const {
     assert(e < EDGES_PER_TET);
-    return m_->new_edge_indices_[m_->tet_edges_(tidx_, e)];
+    return m_->new_edge_indices_[m_->tet2edge(tidx_, e)];
   }
 
   int edge_end_point(int e, int ep) const {
@@ -142,7 +149,7 @@ public:
 
     eep = -1;
     for (v = 0; v < VERTICES_PER_TET; ++v) {
-      if (m_->edges_(m_->tet_edges_(tidx_, e), ep) == m_->tetrahedra_(tidx_, v)) {
+      if (m_->edge2vertex(m_->tet2edge(tidx_, e), ep) == m_->tet2vertex(tidx_, v)) {
         eep = v;
         break;
       }
@@ -155,25 +162,25 @@ public:
 
   bool edge_on_boundary(int e) const {
     assert(e < EDGES_PER_TET);
-    return m_->edge_bdr_marker_[m_->tet_edges_(tidx_, e)];
+    return m_->edge_bdr_marker_[m_->tet2edge(tidx_, e)];
   }
 
   int neighbor(int n) const {
     assert(n < TRIANGLES_PER_TET);
-    return m_->tet_neighbors_(tidx_, n);
+    return m_->neighbor(tidx_, n);
   }
 
   int neighbor_of_neighbor(int n) const {
     assert(n < TRIANGLES_PER_TET);
-    return m_->tet_neighbor_of_neighbor_(tidx_, n);
+    return m_->neighbor_of_neighbor(tidx_, n);
   }
 
   bool face_on_boundary(int f) const {
     assert(f < TRIANGLES_PER_TET);
-    return m_->tet_neighbors_(tidx_, f) < 0;
+    return m_->neighbor(tidx_, f) < 0;
   }
 
-  int attribute() const { return m_->tet_attributes_[tidx_]; }
+  int attribute() const { return m_->attribute(tidx_); }
 
   double volume() const {
     int i;

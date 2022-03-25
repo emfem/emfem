@@ -1,5 +1,4 @@
 #include "em_ctx.h"
-#include "em_io.h"
 #include "em_fwd.h"
 
 int main(int argc, char **argv) {
@@ -13,9 +12,6 @@ int main(int argc, char **argv) {
   ierr = process_options(&ctx); CHKERRQ(ierr);
 
   ierr = create_context(&ctx); CHKERRQ(ierr);
-
-  ierr = read_mdl((std::string(ctx.iprefix) + ".mdl").c_str(), &ctx); CHKERRQ(ierr);
-  ierr = read_emd((std::string(ctx.iprefix) + ".emd").c_str(), &ctx); CHKERRQ(ierr);
 
   ierr = em_forward(&ctx); CHKERRQ(ierr);
 

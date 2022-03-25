@@ -7,67 +7,10 @@
 
 #include <fstream>
 
-PetscErrorCode read_mdl(const char *fn, EMContext *ctx) {
-  tetgenio in, out;
-  tetgenio::facet *f;
-  tetgenio::polygon *p;
-
-  std::string l;
-  std::stringstream ss;
-  std::ifstream ifs(fn);
-
+static PetscErrorCode read_rho(EMContext *ctx, std::stringstream &ss) {
   int i, j, n_rho;
 
   PetscFunctionBegin;
-
-  if (!ifs.good()) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.", fn).c_str());
-  }
-
-  while (std::getline(ifs, l)) {
-    ss << parse_string(l);
-  }
-
-  ss >> in.numberofpoints;
-  in.pointlist = new double[in.numberofpoints * 3];
-
-  for (i = 0; i < in.numberofpoints; ++i) {
-    for (j = 0; j < 3; ++j) {
-      ss >> in.pointlist[i * 3 + j];
-    }
-  }
-
-  ss >> in.numberoffacets;
-  in.facetlist = new tetgenio::facet[in.numberoffacets];
-  in.facetmarkerlist = new int[in.numberoffacets];
-
-  for (i = 0; i < in.numberoffacets; ++i) {
-    f = in.facetlist + i;
-    f->numberofpolygons = 1;
-    f->polygonlist = new tetgenio::polygon[f->numberofpolygons];
-    f->numberofholes = 0;
-    f->holelist = NULL;
-
-    p = f->polygonlist;
-
-    ss >> p->numberofvertices;
-    p->vertexlist = new int[p->numberofvertices];
-    for (j = 0; j < p->numberofvertices; ++j) {
-      ss >> p->vertexlist[j];
-    }
-    ss >> in.facetmarkerlist[i];
-  }
-
-  ss >> in.numberofregions;
-  in.regionlist = new double[in.numberofregions * 5];
-  for (i = 0; i < in.numberofregions; ++i) {
-    for (j = 0; j < 5; ++j) {
-      ss >> in.regionlist[i * 5 + j];
-    }
-    in.regionlist[i * 5 + 4] = std::pow(in.regionlist[i * 5 + 4], 3);
-  }
-
-  ctx->original_mesh->create_from_tetgen(&in);
 
   ss >> n_rho >> ctx->aniso_form;
 
@@ -143,17 +86,131 @@ PetscErrorCode read_mdl(const char *fn, EMContext *ctx) {
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode read_emd(const char* fn, EMContext *ctx) {
+PetscErrorCode read_mdl(EMContext *ctx) {
+  tetgenio in;
+  tetgenio::facet *f;
+  tetgenio::polygon *p;
+
   std::string l;
   std::stringstream ss;
-  std::ifstream ifs(fn);
+
+  int i, j;
+
+  PetscFunctionBegin;
+
+  std::ifstream ifs(ctx->iprefix + std::string(".mdl"));
+  if (!ifs.good()) {
+    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.mdl.", ctx->iprefix).c_str());
+  }
+
+  while (std::getline(ifs, l)) {
+    ss << parse_string(l);
+  }
+
+  ss >> in.numberofpoints;
+  in.pointlist = new double[in.numberofpoints * 3];
+
+  for (i = 0; i < in.numberofpoints; ++i) {
+    for (j = 0; j < 3; ++j) {
+      ss >> in.pointlist[i * 3 + j];
+    }
+  }
+
+  ss >> in.numberoffacets;
+  in.facetlist = new tetgenio::facet[in.numberoffacets];
+  in.facetmarkerlist = new int[in.numberoffacets];
+
+  for (i = 0; i < in.numberoffacets; ++i) {
+    f = in.facetlist + i;
+    f->numberofpolygons = 1;
+    f->polygonlist = new tetgenio::polygon[f->numberofpolygons];
+    f->numberofholes = 0;
+    f->holelist = NULL;
+
+    p = f->polygonlist;
+
+    ss >> p->numberofvertices;
+    p->vertexlist = new int[p->numberofvertices];
+    for (j = 0; j < p->numberofvertices; ++j) {
+      ss >> p->vertexlist[j];
+    }
+    ss >> in.facetmarkerlist[i];
+  }
+
+  ss >> in.numberofregions;
+  in.regionlist = new double[in.numberofregions * 5];
+  for (i = 0; i < in.numberofregions; ++i) {
+    for (j = 0; j < 5; ++j) {
+      ss >> in.regionlist[i * 5 + j];
+    }
+    in.regionlist[i * 5 + 4] = std::pow(in.regionlist[i * 5 + 4], 3);
+  }
+
+  ctx->original_mesh->create_from_tetgen(&in);
+
+  read_rho(ctx, ss);
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode read_mesh(EMContext *ctx) {
+  tetgenio in;
+
+  std::string l;
+  std::stringstream ss;
+
+  int i, j;
+
+  PetscFunctionBegin;
+
+  std::ifstream ifs_mesh(ctx->iprefix + std::string(".mesh"));
+  if (!ifs_mesh.good()) {
+    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.mesh.", ctx->iprefix).c_str());
+  }
+
+  while (std::getline(ifs_mesh, l)) {
+    ss << parse_string(l);
+  }
+
+  ss >> in.numberofpoints;
+  in.pointlist = new double[in.numberofpoints * 3];
+
+  for (i = 0; i < in.numberofpoints; ++i) {
+    for (j = 0; j < 3; ++j) {
+      ss >> in.pointlist[i * 3 + j];
+    }
+  }
+
+  ss >> in.numberoftetrahedra;
+  in.tetrahedronlist = new int[in.numberoftetrahedra * 4];
+  in.numberoftetrahedronattributes = 1;
+  in.tetrahedronattributelist = new double[in.numberoftetrahedra];
+
+  for (i = 0; i < in.numberoftetrahedra; ++i) {
+    for (j = 0; j < 4; ++j) {
+      ss >> in.tetrahedronlist[i * 4 + j];
+    }
+    ss >> in.tetrahedronattributelist[i];
+  }
+
+  ctx->original_mesh->create_from_tetgen(&in);
+
+  read_rho(ctx, ss);
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode read_emd(EMContext *ctx) {
+  std::string l;
+  std::stringstream ss;
   double re, im, err_re, err_im;
   size_t n_freqs, n_rxes, n_txes, n_obses;
 
   PetscFunctionBegin;
 
+  std::ifstream ifs(ctx->iprefix + std::string(".emd"));
   if (!ifs.good()) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.", fn).c_str());
+    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.emd.", ctx->iprefix).c_str());
   }
 
   while (std::getline(ifs, l)) {

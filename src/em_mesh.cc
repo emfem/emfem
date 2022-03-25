@@ -7,11 +7,26 @@
 #include <queue>
 #include <tuple>
 
-void Mesh::create(const std::vector<Point> &vertices, const Eigen::MatrixXi &tets,
-                  const std::vector<int> &tet_attributes) {
-  this->vertices_ = vertices;
-  this->tetrahedra_ = tets;
-  this->tet_attributes_ = tet_attributes;
+void Mesh::create_from_tetgen(tetgenio *in) {
+  int i, t;
+
+  assert(in != NULL);
+
+  if (tio_ == in) {
+    return;
+  }
+
+  if (tio_) {
+    delete tio_;
+    tio_ = NULL;
+  }
+  tio_ = new tetgenio;
+
+  if (in->tetrahedronlist) {
+    tetrahedralize((char *)"zDprfnneQ", in, tio_, NULL);
+  } else {
+    tetrahedralize((char *)"zDpq1.2AafnneQ", in, tio_, NULL);
+  }
 
   build_vertex_info();
   build_edge_info();
@@ -21,54 +36,17 @@ void Mesh::create(const std::vector<Point> &vertices, const Eigen::MatrixXi &tet
   init_kd_tree();
 }
 
-void Mesh::create_from_tetgen(tetgenio *in) {
-  int i, t;
-  Eigen::MatrixXi tetrahedra;
-  std::vector<Point> vertices;
-  std::vector<int> tet_attributes;
-
-  if (tio_) {
-    delete tio_;
-    tio_ = NULL;
-  }
-  tio_ = new tetgenio;
-
-  if (in->tetrahedronlist) {
-    tetrahedralize((char *)"zDprq1.2AafQ", in, tio_, NULL);
-  } else {
-    tetrahedralize((char *)"zDpq1.2AafQ", in, tio_, NULL);
-  }
-
-  vertices.resize(tio_->numberofpoints);
-  for (i = 0; i < tio_->numberofpoints; ++i) {
-    vertices[i][0] = tio_->pointlist[i * 3 + 0];
-    vertices[i][1] = tio_->pointlist[i * 3 + 1];
-    vertices[i][2] = tio_->pointlist[i * 3 + 2];
-  }
-
-  tetrahedra.resize(tio_->numberoftetrahedra, 4);
-  tet_attributes.resize(tio_->numberoftetrahedra);
-  for (t = 0; t < tio_->numberoftetrahedra; ++t) {
-    tetrahedra(t, 0) = tio_->tetrahedronlist[t * 4 + 0];
-    tetrahedra(t, 1) = tio_->tetrahedronlist[t * 4 + 1];
-    tetrahedra(t, 2) = tio_->tetrahedronlist[t * 4 + 2];
-    tetrahedra(t, 3) = tio_->tetrahedronlist[t * 4 + 3];
-    tet_attributes[t] = tio_->tetrahedronattributelist[t];
-  }
-
-  create(vertices, tetrahedra, tet_attributes);
-}
-
 void Mesh::copy(const Mesh &m) {
+  if (this == &m) {
+    return;
+  }
+
   create_from_tetgen(m.tio_);
 }
 
 void Mesh::refine_tetgen(const std::vector<bool> &flag) {
   int t, nt, i;
-  tetgenio *out;
-  Eigen::MatrixXi tetrahedra;
-  std::vector<Point> vertices;
-  std::vector<int> tet_attributes;
+  tetgenio out;
 
   assert(((int)flag.size()) == n_tets());
   assert(tio_->numberoftetrahedra == n_tets());
@@ -98,30 +76,9 @@ void Mesh::refine_tetgen(const std::vector<bool> &flag) {
     }
   }
 
-  out = new tetgenio;
-  tetrahedralize((char *)"zDprq1.2AafQ", tio_, out, NULL);
+  tetrahedralize((char *)"zDprq1.2AafnneQ", tio_, &out, NULL);
 
-  delete tio_;
-  tio_ = out;
-
-  vertices.resize(tio_->numberofpoints);
-  for (i = 0; i < tio_->numberofpoints; ++i) {
-    vertices[i][0] = tio_->pointlist[i * 3 + 0];
-    vertices[i][1] = tio_->pointlist[i * 3 + 1];
-    vertices[i][2] = tio_->pointlist[i * 3 + 2];
-  }
-
-  tetrahedra.resize(tio_->numberoftetrahedra, VERTICES_PER_TET);
-  tet_attributes.resize(tio_->numberoftetrahedra);
-  for (t = 0; t < tio_->numberoftetrahedra; ++t) {
-    tetrahedra(t, 0) = tio_->tetrahedronlist[t * 4 + 0];
-    tetrahedra(t, 1) = tio_->tetrahedronlist[t * 4 + 1];
-    tetrahedra(t, 2) = tio_->tetrahedronlist[t * 4 + 2];
-    tetrahedra(t, 3) = tio_->tetrahedronlist[t * 4 + 3];
-    tet_attributes[t] = tio_->tetrahedronattributelist[t];
-  }
-
-  create(vertices, tetrahedra, tet_attributes);
+  create_from_tetgen(&out);
 }
 
 void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd> &data) {
@@ -141,8 +98,8 @@ void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd>
   PetscFPrintf(comm_, fp, "POINTS %d double\n", n_pts);
 
   for (i = 0; i < n_pts; ++i) {
-    PetscFPrintf(comm_, fp, "%.17g %.17g %.17g\n", vertices_[i][0], vertices_[i][1],
-                 vertices_[i][2]);
+    PetscFPrintf(comm_, fp, "%.17g %.17g %.17g\n", vertex(i)[0], vertex(i)[1],
+                 vertex(i)[2]);
   }
   PetscFPrintf(comm_, fp, "\n");
 
@@ -150,7 +107,7 @@ void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd>
   for (i = 0; i < n_cells; ++i) {
     PetscFPrintf(comm_, fp, "%d", VERTICES_PER_TET);
     for (j = 0; j < VERTICES_PER_TET; ++j) {
-      PetscFPrintf(comm_, fp, " %4d", tetrahedra_(i, j));
+      PetscFPrintf(comm_, fp, " %4d", tet2vertex(i, j));
     }
     PetscFPrintf(comm_, fp, "\n");
   }
@@ -174,7 +131,7 @@ void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd>
   PetscFPrintf(comm_, fp, "SCALARS tet_attr double 1\n");
   PetscFPrintf(comm_, fp, "LOOKUP_TABLE default\n");
   for (i = 0; i < n_cells; ++i) {
-    PetscFPrintf(comm_, fp, "%.15g\n", (double)tet_attributes_[i]);
+    PetscFPrintf(comm_, fp, "%.15g\n", (double)attribute(i));
   }
   PetscFPrintf(comm_, fp, "\n");
 
@@ -197,7 +154,7 @@ void Mesh::partition() {
   nnz = 0;
   for (i = 0; i < n_tets(); ++i) {
     for (j = 0; j < TRIANGLES_PER_TET; ++j) {
-      if (tet_neighbors_(i, j) >= 0) {
+      if (neighbor(i, j) >= 0) {
         ++nnz;
       }
     }
@@ -209,8 +166,8 @@ void Mesh::partition() {
   for (i = 0; i < n_tets(); ++i) {
     xadj[i] = nnz;
     for (j = 0; j < TRIANGLES_PER_TET; ++j) {
-      if (tet_neighbors_(i, j) >= 0) {
-        adjncy[nnz++] = tet_neighbors_(i, j);
+      if (neighbor(i, j) >= 0) {
+        adjncy[nnz++] = neighbor(i, j);
       }
     }
   }
@@ -255,11 +212,11 @@ void Mesh::get_vertex_owners(std::vector<int> &owners) {
   coin_flip = true;
   for (t = 0; t < n_tets(); ++t) {
     for (v = 0; v < VERTICES_PER_TET; ++v) {
-      if (owners[new_vertex_indices_[tetrahedra_(t, v)]] < 0) {
-        owners[new_vertex_indices_[tetrahedra_(t, v)]] = subdomain_[t];
+      if (owners[new_vertex_indices_[tet2vertex(t, v)]] < 0) {
+        owners[new_vertex_indices_[tet2vertex(t, v)]] = subdomain_[t];
       } else {
         if (coin_flip) {
-          owners[new_vertex_indices_[tetrahedra_(t, v)]] = subdomain_[t];
+          owners[new_vertex_indices_[tet2vertex(t, v)]] = subdomain_[t];
         }
         coin_flip = !coin_flip;
       }
@@ -277,11 +234,11 @@ void Mesh::get_edge_owners(std::vector<int> &owners) {
   coin_flip = true;
   for (t = 0; t < n_tets(); ++t) {
     for (e = 0; e < EDGES_PER_TET; ++e) {
-      if (owners[new_edge_indices_[tet_edges_(t, e)]] < 0) {
-        owners[new_edge_indices_[tet_edges_(t, e)]] = subdomain_[t];
+      if (owners[new_edge_indices_[tet2edge(t, e)]] < 0) {
+        owners[new_edge_indices_[tet2edge(t, e)]] = subdomain_[t];
       } else {
         if (coin_flip) {
-          owners[new_edge_indices_[tet_edges_(t, e)]] = subdomain_[t];
+          owners[new_edge_indices_[tet2edge(t, e)]] = subdomain_[t];
         }
         coin_flip = !coin_flip;
       }
@@ -332,7 +289,7 @@ void Mesh::extract_ghost_cells() {
   for (t = 0; t < n_tets(); ++t) {
     if (subdomain_[t] == comm_rank_) {
       for (v = 0; v < VERTICES_PER_TET; ++v) {
-        vertices_on_subdomain[tetrahedra_(t, v)] = true;
+        vertices_on_subdomain[tet2vertex(t, v)] = true;
       }
     }
   }
@@ -342,7 +299,7 @@ void Mesh::extract_ghost_cells() {
   for (t = 0; t < n_tets(); ++t) {
     if (subdomain_[t] != comm_rank_) {
       for (v = 0; v < VERTICES_PER_TET; ++v) {
-        if (vertices_on_subdomain[tetrahedra_(t, v)]) {
+        if (vertices_on_subdomain[tet2vertex(t, v)]) {
           ghost_flag_[t] = true;
           break;
         }
@@ -361,154 +318,42 @@ void Mesh::build_vertex_info() {
 }
 
 void Mesh::build_edge_info() {
-  struct Edge {
-    Edge() { this->es_ = this->ee_ = -1; }
+  int i, j;
 
-    Edge(int es, int ee) {
-      this->es_ = std::min(es, ee);
-      this->ee_ = std::max(es, ee);
+  for (i = 0; i < tio_->numberofedges; ++i) {
+    if (tio_->edgelist[i * 2 + 0] > tio_->edgelist[i * 2 + 1]) {
+      std::swap(tio_->edgelist[i * 2 + 0], tio_->edgelist[i * 2 + 1]);
     }
-
-    bool operator==(const Edge &e) const { return (e.es_ == this->es_ && e.ee_ == this->ee_); }
-
-    bool operator<(const Edge &e) const { return (es_ < e.es_ || (es_ == e.es_ && ee_ < e.ee_)); }
-
-    int es_, ee_;
-  };
-
-  typedef std::tuple<Edge, int, int> TetEdge;
-
-  int i, t, e, newe, ne;
-  std::vector<TetEdge> edges;
-  int lec[EDGES_PER_TET][VERTICES_PER_EDGE] = { { 0, 1 }, { 0, 2 }, { 0, 3 },
-                                                { 1, 2 }, { 1, 3 }, { 2, 3 } };
-
-  edges.resize(n_tets() * EDGES_PER_TET);
-
-  for (t = 0; t < n_tets(); ++t) {
-    for (i = 0; i < EDGES_PER_TET; ++i) {
-      edges[t * EDGES_PER_TET + i] =
-          std::make_tuple(Edge(tetrahedra_(t, lec[i][0]), tetrahedra_(t, lec[i][1])), t, i);
-    }
-  }
-
-  std::sort(edges.begin(), edges.end());
-  tet_edges_.resize(n_tets(), EDGES_PER_TET);
-
-  e = 0;
-  newe = 0;
-  ne = 0;
-  while (newe < n_tets() * EDGES_PER_TET) {
-    while (newe < n_tets() * EDGES_PER_TET) {
-      if (std::get<0>(edges[e]) == std::get<0>(edges[newe])) {
-        ++newe;
-      } else {
-        break;
-      }
-    }
-
-    e = newe;
-    ++ne;
-  }
-
-  edges_.resize(ne, VERTICES_PER_EDGE);
-
-  e = 0;
-  newe = 0;
-  ne = 0;
-  while (e < n_tets() * EDGES_PER_TET) {
-    while (newe < n_tets() * EDGES_PER_TET) {
-      if (std::get<0>(edges[e]) == std::get<0>(edges[newe])) {
-        ++newe;
-      } else {
-        break;
-      }
-    }
-
-    edges_(ne, 0) = std::get<0>(edges[e]).es_;
-    edges_(ne, 1) = std::get<0>(edges[e]).ee_;
-
-    for (; e < newe; ++e) {
-      tet_edges_(std::get<1>(edges[e]), std::get<2>(edges[e])) = ne;
-    }
-
-    ++ne;
   }
 
   new_edge_indices_.resize(n_edges());
-  for (e = 0; e < n_edges(); ++e) {
-    new_edge_indices_[e] = e;
+  for (i = 0; i < n_edges(); ++i) {
+    new_edge_indices_[i] = i;
   }
 }
 
 void Mesh::build_neighbor_info() {
-  struct Face {
-    Face() { nodes_[0] = nodes_[1] = nodes_[2] = -1; };
+  int t, f, n;
 
-    Face(int *nodes) {
-      std::copy(nodes, nodes + VERTICES_PER_TRIANGLE, nodes_);
-      std::sort(nodes_, nodes_ + VERTICES_PER_TRIANGLE);
-    }
-
-    bool operator<(const Face &f) const {
-      return (nodes_[0] < f.nodes_[0]) || (nodes_[0] == f.nodes_[0] && nodes_[1] < f.nodes_[1]) ||
-             (nodes_[0] == f.nodes_[0] && nodes_[1] == f.nodes_[1] && nodes_[2] < f.nodes_[2]);
-    }
-
-    bool operator==(const Face &f) {
-      return (nodes_[0] == f.nodes_[0] && nodes_[1] == f.nodes_[1] && nodes_[2] == f.nodes_[2]);
-    }
-
-    int nodes_[VERTICES_PER_TRIANGLE];
-  };
-
-  typedef std::tuple<Face, int, int> TetFace;
-
-  std::vector<TetFace> faces;
-  int i, j, t, f, nodes[VERTICES_PER_TRIANGLE];
-
-  faces.resize(n_tets() * TRIANGLES_PER_TET);
+  tet_non_.resize(n_tets() * TRIANGLES_PER_TET);
+  std::fill(tet_non_.begin(), tet_non_.end(), -1);
 
   for (t = 0; t < n_tets(); ++t) {
-    for (i = 0; i < TRIANGLES_PER_TET; ++i) {
-      for (j = 0; j < VERTICES_PER_TRIANGLE; ++j) {
-        nodes[j] = tetrahedra_(t, (i + j + 1) % VERTICES_PER_TET);
+    for (f = 0; f < TRIANGLES_PER_TET; ++f) {
+      n = neighbor(t, f);
+      if (n < 0) {
+        continue;
       }
-      faces[t * TRIANGLES_PER_TET + i] = std::make_tuple(Face(nodes), t, i);
-    }
-  }
-
-  std::sort(faces.begin(), faces.end());
-
-  tet_neighbors_.resize(n_tets(), TRIANGLES_PER_TET);
-  tet_neighbors_.setConstant(-1);
-  tet_neighbor_of_neighbor_.resize(n_tets(), TRIANGLES_PER_TET);
-  tet_neighbor_of_neighbor_.setConstant(-1);
-
-  f = 0;
-  while (true) {
-    if (TRIANGLES_PER_TET * n_tets() - 1 <= f) {
-      break;
-    }
-
-    if (std::get<0>(faces[f]) == std::get<0>(faces[f + 1])) {
-      tet_neighbors_(std::get<1>(faces[f]), std::get<2>(faces[f])) = std::get<1>(faces[f + 1]);
-      tet_neighbor_of_neighbor_(std::get<1>(faces[f]), std::get<2>(faces[f])) =
-          std::get<2>(faces[f + 1]);
-      tet_neighbors_(std::get<1>(faces[f + 1]), std::get<2>(faces[f + 1])) = std::get<1>(faces[f]);
-      tet_neighbor_of_neighbor_(std::get<1>(faces[f + 1]), std::get<2>(faces[f + 1])) =
-          std::get<2>(faces[f]);
-      f += 2;
-    } else {
-      f += 1;
+      tet_non_[t * TRIANGLES_PER_TET + f] =
+          std::find(tio_->neighborlist + n * TRIANGLES_PER_TET,
+                    tio_->neighborlist + (n + 1) * TRIANGLES_PER_TET, t) -
+          (tio_->neighborlist + n * TRIANGLES_PER_TET);
     }
   }
 }
 
 void Mesh::build_boundary_info() {
-  int t, f, i;
-  int lec[TRIANGLES_PER_TET]
-         [EDGES_PER_TRIANGLE] = { { 3, 4, 5 }, { 1, 2, 5 }, { 0, 2, 4 }, { 0, 1, 3 } };
+  int f, i;
 
   vertex_bdr_marker_.resize(n_vertices());
   std::fill(vertex_bdr_marker_.begin(), vertex_bdr_marker_.end(), false);
@@ -516,30 +361,28 @@ void Mesh::build_boundary_info() {
   edge_bdr_marker_.resize(n_edges());
   std::fill(edge_bdr_marker_.begin(), edge_bdr_marker_.end(), false);
 
-  for (t = 0; t < n_tets(); ++t) {
-    for (f = 0; f < TRIANGLES_PER_TET; ++f) {
-      if (tet_neighbors_(t, f) < 0) {
-        for (i = 0; i < VERTICES_PER_TRIANGLE; ++i) {
-          vertex_bdr_marker_[tetrahedra_(t, (f + i + 1) % 4)] = true;
-        }
-        for (i = 0; i < EDGES_PER_TRIANGLE; ++i) {
-          edge_bdr_marker_[tet_edges_(t, lec[f][i])] = true;
-        }
+  for (f = 0; f < tio_->numberoftrifaces; ++f) {
+    if (tio_->face2tetlist[f * 2 + 0] < 0 || tio_->face2tetlist[f * 2 + 1] < 0) {
+      for (i = 0; i < VERTICES_PER_TRIANGLE; ++i) {
+        vertex_bdr_marker_[tio_->trifacelist[f * VERTICES_PER_TRIANGLE + i]] = true;
+      }
+      for (i = 0; i < EDGES_PER_TRIANGLE; ++i) {
+        edge_bdr_marker_[tio_->face2edgelist[f * EDGES_PER_TRIANGLE + i]] = true;
       }
     }
   }
 }
 
 void Mesh::init_kd_tree() {
-  int i, j;
+  int t, v;
 
   kd_index_.reset(new KDTree(3, *this, 100));
   kd_index_->buildIndex();
 
   vertex_to_tet_.resize(n_vertices());
-  for (i = 0; i < n_tets(); ++i) {
-    for (j = 0; j < VERTICES_PER_TET; ++j) {
-      vertex_to_tet_[new_vertex_indices_[tetrahedra_(i, j)]] = i;
+  for (t = 0; t < n_tets(); ++t) {
+    for (v = 0; v < VERTICES_PER_TET; ++v) {
+      vertex_to_tet_[new_vertex_indices_[tet2vertex(t, v)]] = t;
     }
   }
 }
@@ -550,7 +393,7 @@ std::tuple<Point, int> Mesh::find_closest_vertex(const Point &p) {
 
   kd_index_->knnSearch(&p[0], 1, &idx, &dist);
 
-  return std::make_tuple(vertices_[idx], new_vertex_indices_[idx]);
+  return std::make_tuple(vertex(idx), new_vertex_indices_[idx]);
 }
 
 int Mesh::find_cell_around_point(const Point &p) {

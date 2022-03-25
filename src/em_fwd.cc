@@ -1426,6 +1426,13 @@ PetscErrorCode em_forward(EMContext *ctx) {
 
   LogStageHelper lsh("Forward");
 
+  if (ctx->mesh_format == MDL) {
+    ierr = read_mdl(ctx); CHKERRQ(ierr);
+  } else {
+    ierr = read_mesh(ctx); CHKERRQ(ierr);
+  }
+  ierr = read_emd(ctx); CHKERRQ(ierr);
+
   ierr = refine_receiving_area(ctx); CHKERRQ(ierr);
 
   ierr = update_background_model(ctx); CHKERRQ(ierr);

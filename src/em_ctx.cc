@@ -103,6 +103,7 @@ PetscErrorCode destroy_context(EMContext *ctx) {
 PetscErrorCode process_options(EMContext *ctx) {
   PetscBool flg;
   PetscErrorCode ierr;
+  const char *MeshFormat[] = {"mdl", "mesh"};
   const char *InnerPCType[] = {"mixed", "ams", "direct"};
   const char *DirectSolverType[] = {"mumps", "superlu_dist"};
   const char *RefineStrategy[] = {"fixed_number", "fixed_fraction"};
@@ -126,6 +127,9 @@ PetscErrorCode process_options(EMContext *ctx) {
 
   ctx->max_rx_edge_length = 1000;
   ierr = PetscOptionsGetReal(NULL, NULL, "-max_rx_edge_length", &ctx->max_rx_edge_length, &flg); CHKERRQ(ierr);
+
+  ctx->mesh_format = MDL;
+  ierr = PetscOptionsEList("-mesh_format", "", "", MeshFormat, sizeof(MeshFormat) / sizeof(MeshFormat[0]), MeshFormat[ctx->mesh_format], &ctx->mesh_format, &flg); CHKERRQ(ierr);
 
   ctx->inner_pc_type = Mixed;
   ierr = PetscOptionsEList("-inner_pc_type", "", "", InnerPCType, sizeof(InnerPCType) / sizeof(InnerPCType[0]), InnerPCType[ctx->inner_pc_type], &ctx->inner_pc_type, &flg); CHKERRQ(ierr);
