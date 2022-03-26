@@ -6,6 +6,7 @@
 
 #include <queue>
 #include <tuple>
+#include <unordered_map>
 
 void Mesh::create_from_tetgen(tetgenio *in) {
   int i, t;
@@ -79,6 +80,49 @@ void Mesh::refine_tetgen(const std::vector<bool> &flag) {
   tetrahedralize((char *)"zDprq1.2AafnneQ", tio_, &out, NULL);
 
   create_from_tetgen(&out);
+}
+
+void Mesh::refine_uniform() {
+  static int tet_local_corner_idx[8][4] = { { 0, 6, 9, 5 }, { 6, 1, 7, 8 }, { 9, 7, 2, 4 },
+                                            { 5, 8, 4, 3 }, { 6, 7, 9, 5 }, { 6, 8, 7, 5 },
+                                            { 5, 8, 7, 4 }, { 5, 7, 9, 4 } };
+
+  tetgenio in;
+  int i, j, t, corners[10];
+
+  in.numberofpoints = tio_->numberofpoints + tio_->numberofedges;
+  in.pointlist = new double[in.numberofpoints * 3];
+  std::copy(tio_->pointlist, tio_->pointlist + tio_->numberofpoints * 3, in.pointlist);
+  for (i = 0; i < tio_->numberofedges; ++i) {
+    for (j = 0; j < 3; ++j) {
+      in.pointlist[(tio_->numberofpoints + i) * 3 + j] =
+          (tio_->pointlist[tio_->edgelist[i * 2 + 0] * 3 + j] +
+           tio_->pointlist[tio_->edgelist[i * 2 + 1] * 3 + j]) /
+          2.0;
+    }
+  }
+
+  in.numberoftetrahedra = tio_->numberoftetrahedra * 8;
+  in.tetrahedronlist = new int[in.numberoftetrahedra * 4];
+  in.numberoftetrahedronattributes = 1;
+  in.tetrahedronattributelist = new double[in.numberoftetrahedra];
+
+  for (t = 0; t < tio_->numberoftetrahedra; ++t) {
+    for (i = 0; i < 4; ++i) {
+      corners[i] = tio_->tetrahedronlist[t * tio_->numberofcorners + i];
+    }
+    for (i = 0; i < 6; ++i) {
+      corners[i + 4] = tio_->tet2edgelist[t * 6 + i] + tio_->numberofpoints;
+    }
+    for (i = 0; i < 8; ++i) {
+      for (j = 0; j < 4; ++j) {
+        in.tetrahedronlist[(t * 8 + i) * 4 + j] = corners[tet_local_corner_idx[i][j]];
+      }
+      in.tetrahedronattributelist[t * 8 + i] = tio_->tetrahedronattributelist[t];
+    }
+  }
+
+  create_from_tetgen(&in);
 }
 
 void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd> &data) {

@@ -44,6 +44,8 @@ public:
 
   void refine_tetgen(const std::vector<bool> &);
 
+  void refine_uniform();
+
   void get_vertex_owners(std::vector<int> &);
 
   void get_edge_owners(std::vector<int> &);

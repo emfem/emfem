@@ -905,6 +905,18 @@ PetscErrorCode calculate_response_csem(EMContext *ctx, int fidx, int tidx) {
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode refine_uniform(EMContext *ctx) {
+  int i;
+
+  PetscFunctionBegin;
+
+  for (i = 0; i < ctx->n_uniform_refinements; ++i) {
+    ctx->original_mesh->refine_uniform();
+  }
+
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode refine_receiving_area(EMContext *ctx) {
   bool flg;
   int i, t;
@@ -1432,6 +1444,8 @@ PetscErrorCode em_forward(EMContext *ctx) {
     ierr = read_mesh(ctx); CHKERRQ(ierr);
   }
   ierr = read_emd(ctx); CHKERRQ(ierr);
+
+  ierr = refine_uniform(ctx); CHKERRQ(ierr);
 
   ierr = refine_receiving_area(ctx); CHKERRQ(ierr);
 

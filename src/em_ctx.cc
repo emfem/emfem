@@ -152,6 +152,9 @@ PetscErrorCode process_options(EMContext *ctx) {
   ctx->max_adaptive_refinements = 0;
   ierr = PetscOptionsGetInt(NULL, NULL, "-max_adaptive_refinements", &ctx->max_adaptive_refinements, &flg); CHKERRQ(ierr);
 
+  ctx->n_uniform_refinements = 0;
+  ierr = PetscOptionsGetInt(NULL, NULL, "-n_uniform_refinements", &ctx->n_uniform_refinements, &flg); CHKERRQ(ierr);
+
   ctx->max_dofs = 1000000;
   ierr = PetscOptionsGetInt(NULL, NULL, "-max_dofs", &ctx->max_dofs, &flg); CHKERRQ(ierr);
 
