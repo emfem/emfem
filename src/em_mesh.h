@@ -34,7 +34,7 @@ public:
     }
   }
 
-  void create_from_tetgen(tetgenio *);
+  void create(tetgenio *);
 
   void copy(const Mesh &);
 
@@ -94,14 +94,18 @@ private:
 private:
   void partition();
   void extract_ghost_cells();
-  void compute_new_vertex_indices_();
-  void compute_new_edge_indices_();
+  void compute_new_vertex_indices();
+  void compute_new_edge_indices();
 
 private:
+  void init_mesh();
   void build_vertex_info();
   void build_edge_info();
   void build_neighbor_info();
   void build_boundary_info();
+
+private:
+  static void copy_tetgenio(tetgenio *, tetgenio *);
 
 private:
   MPI_Comm comm_;

@@ -6,9 +6,63 @@
 
 #include <queue>
 #include <tuple>
-#include <unordered_map>
 
-void Mesh::create_from_tetgen(tetgenio *in) {
+#define COPY_TETGENIO_MEMBER(IN, OUT, MEMBER, TYPE, NUMBER, SIZE)                                  \
+  do {                                                                                             \
+    if ((IN)->MEMBER != NULL) {                                                                    \
+      (OUT)->MEMBER = new TYPE[(OUT)->NUMBER * (SIZE)];                                            \
+      std::copy((IN)->MEMBER, (IN)->MEMBER + ((OUT)->NUMBER * (SIZE)), (OUT)->MEMBER);             \
+    }                                                                                              \
+  } while (0);
+
+void Mesh::copy_tetgenio(tetgenio *in, tetgenio *out) {
+  assert(in != NULL);
+  assert(out != NULL);
+
+  if (in == out) {
+    return;
+  }
+
+  out->deinitialize();
+  out->initialize();
+
+  out->numberofpoints = in->numberofpoints;
+  COPY_TETGENIO_MEMBER(in, out, pointlist, double, numberofpoints, 3);
+  COPY_TETGENIO_MEMBER(in, out, pointmarkerlist, int, numberofpoints, 1);
+  COPY_TETGENIO_MEMBER(in, out, point2tetlist, int, numberofpoints, 1);
+
+  out->numberoftetrahedra = in->numberoftetrahedra;
+  out->numberofcorners = in->numberofcorners;
+  out->numberoftetrahedronattributes = in->numberoftetrahedronattributes;
+  COPY_TETGENIO_MEMBER(in, out, tetrahedronlist, int, numberoftetrahedra, out->numberofcorners);
+  COPY_TETGENIO_MEMBER(in, out, tetrahedronattributelist, double, numberoftetrahedra,
+                       out->numberoftetrahedronattributes);
+  COPY_TETGENIO_MEMBER(in, out, neighborlist, int, numberoftetrahedra, 4);
+  COPY_TETGENIO_MEMBER(in, out, tet2facelist, int, numberoftetrahedra, 4);
+  COPY_TETGENIO_MEMBER(in, out, tet2edgelist, int, numberoftetrahedra, 6);
+
+  out->numberoftrifaces = in->numberoftrifaces;
+  COPY_TETGENIO_MEMBER(in, out, trifacelist, int, numberoftrifaces, 3);
+  COPY_TETGENIO_MEMBER(in, out, trifacemarkerlist, int, numberoftrifaces, 1);
+  COPY_TETGENIO_MEMBER(in, out, face2tetlist, int, numberoftrifaces, 2);
+  COPY_TETGENIO_MEMBER(in, out, face2edgelist, int, numberoftrifaces, 3);
+
+  out->numberofedges = in->numberofedges;
+  COPY_TETGENIO_MEMBER(in, out, edgelist, int, numberofedges, 2);
+  COPY_TETGENIO_MEMBER(in, out, edgemarkerlist, int, numberofedges, 1);
+  COPY_TETGENIO_MEMBER(in, out, edge2tetlist, int, numberofedges, 1);
+}
+
+void Mesh::init_mesh() {
+  build_vertex_info();
+  build_edge_info();
+  build_neighbor_info();
+  build_boundary_info();
+  partition();
+  init_kd_tree();
+}
+
+void Mesh::create(tetgenio *in) {
   int i, t;
 
   assert(in != NULL);
@@ -29,12 +83,7 @@ void Mesh::create_from_tetgen(tetgenio *in) {
     tetrahedralize((char *)"zDpq1.2AafnneQ", in, tio_, NULL);
   }
 
-  build_vertex_info();
-  build_edge_info();
-  build_neighbor_info();
-  build_boundary_info();
-  partition();
-  init_kd_tree();
+  init_mesh();
 }
 
 void Mesh::copy(const Mesh &m) {
@@ -42,12 +91,18 @@ void Mesh::copy(const Mesh &m) {
     return;
   }
 
-  create_from_tetgen(m.tio_);
+  if (tio_ == NULL) {
+    tio_ = new tetgenio;
+  }
+
+  copy_tetgenio(m.tio_, tio_);
+
+  init_mesh();
 }
 
 void Mesh::refine_tetgen(const std::vector<bool> &flag) {
   int t, nt, i;
-  tetgenio out;
+  tetgenio* out;
 
   assert(((int)flag.size()) == n_tets());
   assert(tio_->numberoftetrahedra == n_tets());
@@ -77,9 +132,12 @@ void Mesh::refine_tetgen(const std::vector<bool> &flag) {
     }
   }
 
-  tetrahedralize((char *)"zDprq1.2AafnneQ", tio_, &out, NULL);
+  out = new tetgenio;
+  tetrahedralize((char *)"zDprq1.2AafnneQ", tio_, out, NULL);
+  delete tio_;
+  tio_ = out;
 
-  create_from_tetgen(&out);
+  init_mesh();
 }
 
 void Mesh::refine_uniform() {
@@ -122,7 +180,7 @@ void Mesh::refine_uniform() {
     }
   }
 
-  create_from_tetgen(&in);
+  create(&in);
 }
 
 void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd> &data) {
@@ -242,8 +300,8 @@ void Mesh::partition() {
   std::copy(part.begin(), part.end(), subdomain_.begin());
 
   extract_ghost_cells();
-  compute_new_vertex_indices_();
-  compute_new_edge_indices_();
+  compute_new_vertex_indices();
+  compute_new_edge_indices();
 }
 
 void Mesh::get_vertex_owners(std::vector<int> &owners) {
@@ -290,7 +348,7 @@ void Mesh::get_edge_owners(std::vector<int> &owners) {
   }
 }
 
-void Mesh::compute_new_vertex_indices_() {
+void Mesh::compute_new_vertex_indices() {
   std::vector<int> owners;
   int v, subdomain, next_free_index;
 
@@ -307,7 +365,7 @@ void Mesh::compute_new_vertex_indices_() {
   }
 }
 
-void Mesh::compute_new_edge_indices_() {
+void Mesh::compute_new_edge_indices() {
   std::vector<int> owners;
   int e, subdomain, next_free_index;
 

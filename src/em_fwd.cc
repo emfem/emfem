@@ -1445,9 +1445,9 @@ PetscErrorCode em_forward(EMContext *ctx) {
   }
   ierr = read_emd(ctx); CHKERRQ(ierr);
 
-  ierr = refine_uniform(ctx); CHKERRQ(ierr);
-
   ierr = refine_receiving_area(ctx); CHKERRQ(ierr);
+
+  ierr = refine_uniform(ctx); CHKERRQ(ierr);
 
   ierr = update_background_model(ctx); CHKERRQ(ierr);
 
