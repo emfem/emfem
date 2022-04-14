@@ -1,7 +1,6 @@
 #include "em_utils.h"
 #include "em_ctx.h"
 #include "em_la.h"
-#include "tetgen.h"
 #include "em_mesh.h"
 #include "em_fwd.h"
 
@@ -125,7 +124,8 @@ PetscErrorCode create_pc(EMContext *ctx) {
 
   LogEventHelper leh(ctx->CreatePC);
 
-  ierr = MatDuplicate(ctx->C, MAT_COPY_VALUES, &ctx->B); CHKERRQ(ierr);
+  ierr = MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->B); CHKERRQ(ierr);
+  ierr = MatCopy(ctx->C, ctx->B, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
   ierr = MatAXPY(ctx->B, 1.0, ctx->M, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
   ierr = PetscObjectSetName((PetscObject)(ctx->B), "B"); CHKERRQ(ierr);
   ierr = MatSetOptionsPrefix(ctx->B, "B_"); CHKERRQ(ierr);

@@ -1,5 +1,4 @@
 #include "em_ctx.h"
-#include "tetgen.h"
 #include "em_utils.h"
 #include "em_mesh.h"
 

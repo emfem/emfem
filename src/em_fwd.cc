@@ -324,22 +324,22 @@ PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
   nrow = ctx->local_edges.second - ctx->local_edges.first;
 
   ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, nrow, nrow, PETSC_DECIDE, PETSC_DECIDE, &rptr[0], &cidx[0], NULL, &ctx->C); CHKERRQ(ierr);
-  ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, nrow, nrow, PETSC_DECIDE, PETSC_DECIDE, &rptr[0], &cidx[0], NULL, &ctx->M); CHKERRQ(ierr);
+  ierr = MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->M); CHKERRQ(ierr);
 
   ierr = VecCreateMPI(ctx->group_comm, nrow, PETSC_DECIDE, &ctx->s.re); CHKERRQ(ierr);
-  ierr = VecCreateMPI(ctx->group_comm, nrow, PETSC_DECIDE, &ctx->s.im); CHKERRQ(ierr);
+  ierr = VecDuplicate(ctx->s.re, &ctx->s.im); CHKERRQ(ierr);
   ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->dual_e.re); CHKERRQ(ierr);
-  ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->dual_e.im); CHKERRQ(ierr);
+  ierr = VecDuplicate(ctx->dual_e.re, &ctx->dual_e.im); CHKERRQ(ierr);
   if (tidx < 0) {
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->mt_e[XY_POLAR].re); CHKERRQ(ierr);
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->mt_e[XY_POLAR].im); CHKERRQ(ierr);
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->mt_e[YX_POLAR].re); CHKERRQ(ierr);
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->mt_e[YX_POLAR].im); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].re); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].im); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].re); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].im); CHKERRQ(ierr);
   } else {
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->csem_e.re); CHKERRQ(ierr);
-    ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->csem_e.im); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->csem_e.re); CHKERRQ(ierr);
+    ierr = VecDuplicate(ctx->dual_e.re, &ctx->csem_e.im); CHKERRQ(ierr);
   }
-  ierr = VecCreateMPI(ctx->group_comm, nrow, PETSC_DECIDE, &ctx->w); CHKERRQ(ierr);
+  ierr = VecDuplicate(ctx->s.re, &ctx->w); CHKERRQ(ierr);
 
   if ((InnerPCType)ctx->inner_pc_type == Mixed) {
     if (ctx->mesh->n_edges() > ctx->pc_threshold) {
@@ -1353,10 +1353,10 @@ PetscErrorCode forward_mt(EMContext *ctx, int fidx) {
     ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"); CHKERRQ(ierr);
     ierr = solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol); CHKERRQ(ierr);
 
+    ierr = destroy_pc(ctx); CHKERRQ(ierr);
+
     ierr = estimate_error(ctx, fidx, -3); CHKERRQ(ierr);
     ierr = save_mesh(ctx, (string_format("%s-%02d-%02d.vtk", ctx->oprefix, fidx, cycle)).c_str(), -3); CHKERRQ(ierr);
-
-    ierr = destroy_pc(ctx); CHKERRQ(ierr);
 
     ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
 
@@ -1407,10 +1407,10 @@ PetscErrorCode forward_csem(EMContext *ctx, int fidx, int tidx) {
     ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"); CHKERRQ(ierr);
     ierr = solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol); CHKERRQ(ierr);
 
+    ierr = destroy_pc(ctx); CHKERRQ(ierr);
+
     ierr = estimate_error(ctx, fidx, tidx); CHKERRQ(ierr);
     ierr = save_mesh(ctx, (string_format("%s-%02d-%03d-%02d.vtk", ctx->oprefix, fidx, tidx, cycle)).c_str(), tidx); CHKERRQ(ierr);
-
-    ierr = destroy_pc(ctx); CHKERRQ(ierr);
 
     ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
 
