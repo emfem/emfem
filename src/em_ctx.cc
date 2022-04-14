@@ -164,6 +164,9 @@ PetscErrorCode process_options(EMContext *ctx) {
   ctx->refine_strategy = FixedFraction;
   ierr = PetscOptionsEList("-refine_strategy", "", "", RefineStrategy, sizeof(RefineStrategy) / sizeof(RefineStrategy[0]), RefineStrategy[ctx->refine_strategy], &ctx->refine_strategy, &flg); CHKERRQ(ierr);
 
+  ctx->save_mesh = PETSC_TRUE;
+  ierr = PetscOptionsGetBool(NULL, NULL, "-save_mesh", &ctx->save_mesh, &flg); CHKERRQ(ierr);
+
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);

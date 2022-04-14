@@ -1356,7 +1356,9 @@ PetscErrorCode forward_mt(EMContext *ctx, int fidx) {
     ierr = destroy_pc(ctx); CHKERRQ(ierr);
 
     ierr = estimate_error(ctx, fidx, -3); CHKERRQ(ierr);
-    ierr = save_mesh(ctx, (string_format("%s-%02d-%02d.vtk", ctx->oprefix, fidx, cycle)).c_str(), -3); CHKERRQ(ierr);
+    if (ctx->save_mesh) {
+      ierr = save_mesh(ctx, (string_format("%s-%02d-%02d.vtk", ctx->oprefix, fidx, cycle)).c_str(), -3); CHKERRQ(ierr);
+    }
 
     ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
 
@@ -1410,7 +1412,9 @@ PetscErrorCode forward_csem(EMContext *ctx, int fidx, int tidx) {
     ierr = destroy_pc(ctx); CHKERRQ(ierr);
 
     ierr = estimate_error(ctx, fidx, tidx); CHKERRQ(ierr);
-    ierr = save_mesh(ctx, (string_format("%s-%02d-%03d-%02d.vtk", ctx->oprefix, fidx, tidx, cycle)).c_str(), tidx); CHKERRQ(ierr);
+    if (ctx->save_mesh) {
+      ierr = save_mesh(ctx, (string_format("%s-%02d-%03d-%02d.vtk", ctx->oprefix, fidx, tidx, cycle)).c_str(), tidx); CHKERRQ(ierr);
+    }
 
     ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
 

@@ -52,7 +52,7 @@ struct EMContext {
   Mat G;
   std::vector<PetscReal> v_coords;
 
-  PetscBool use_ams;
+  PetscBool use_ams, save_mesh;
   char iprefix[256], oprefix[256];
   PetscReal max_rx_edge_length, refine_fraction, e_rtol, dual_rtol;
   PetscInt max_adaptive_refinements, n_uniform_refinements, max_dofs, refine_strategy, n_groups,
