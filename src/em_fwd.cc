@@ -86,10 +86,10 @@ PetscErrorCode generate_layered_model(EMContext *ctx, const Point &tl, const Poi
   fp = p;
 
   while (fp[2] < br[2]) {
-    v = std::get<1>(ctx->original_mesh->find_closest_vertex(fp));
-    t = ctx->original_mesh->find_cell_around_point(Point(fp[0], fp[1], fp[2] + EPS));
+    v = std::get<1>(ctx->coarse_mesh->find_closest_vertex(fp));
+    t = ctx->coarse_mesh->find_cell_around_point(Point(fp[0], fp[1], fp[2] + EPS));
 
-    cell = TetAccessor(ctx->original_mesh.get(), t);
+    cell = TetAccessor(ctx->coarse_mesh.get(), t);
 
     ierr = get_cell_attribute(ctx, cell, sigma); CHKERRQ(ierr);
 
@@ -140,10 +140,10 @@ PetscErrorCode update_background_model(EMContext *ctx) {
   PetscFunctionBegin;
 
   p[0] = p[1] = p[2] = -1.0E+15;
-  top_left = std::get<0>(ctx->original_mesh->find_closest_vertex(p));
+  top_left = std::get<0>(ctx->coarse_mesh->find_closest_vertex(p));
 
   p[0] = p[1] = p[2] = 1.0E+15;
-  bottom_right = std::get<0>(ctx->original_mesh->find_closest_vertex(p));
+  bottom_right = std::get<0>(ctx->coarse_mesh->find_closest_vertex(p));
 
   ctx->top_corners[0] = Point(top_left[0], top_left[1], top_left[2]);
   ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[0], ctx->ztop[0], ctx->lsig[0]); CHKERRQ(ierr);
@@ -711,7 +711,7 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
 
     t = ctx->mesh->find_cell_around_point(center);
     if (t < 0) {
-      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d is not found in mesh.", tidx).c_str());
+      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d-%d is not found in mesh.", tidx, j).c_str());
     }
     cell = TetAccessor(ctx->mesh.get(), t);
 
@@ -945,13 +945,54 @@ PetscErrorCode refine_uniform(EMContext *ctx) {
   PetscFunctionBegin;
 
   for (i = 0; i < ctx->n_uniform_refinements; ++i) {
-    ctx->original_mesh->refine_uniform();
+    ctx->mesh->refine_uniform();
   }
 
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode refine_receiving_area(EMContext *ctx) {
+PetscErrorCode refine_tx_area(EMContext *ctx, int tidx) {
+  bool flg;
+  int i, t;
+  std::vector<bool> refine_flag;
+  std::vector<std::tuple<Point, VectorD, double, double>> dipoles;
+
+  PetscFunctionBegin;
+
+  divide_line_source(&ctx->tx[tidx * TX_SIZE], ctx->n_tx_divisions, dipoles);
+
+  while (true) {
+    if (ctx->max_tx_edge_length <= 0.0) {
+      break;
+    }
+
+    refine_flag.resize(ctx->mesh->n_tets());
+    std::fill(refine_flag.begin(), refine_flag.end(), false);
+
+    flg = false;
+
+    for (i = 0; i < (int)dipoles.size(); ++i) {
+      t = ctx->mesh->find_cell_around_point(std::get<0>(dipoles[i]));
+      if (t < 0) {
+        SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d-%d is not found in mesh.", tidx, i).c_str());
+      }
+      if (TetAccessor(ctx->mesh.get(), t).volume() > std::pow(ctx->max_tx_edge_length, 3)) {
+        flg = true;
+        refine_flag[t] = true;
+      }
+    }
+
+    if (!flg) {
+      break;
+    }
+
+    ctx->mesh->refine_tetgen(refine_flag);
+  }
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode refine_rx_area(EMContext *ctx) {
   bool flg;
   int i, t;
   std::vector<bool> refine_flag;
@@ -963,16 +1004,16 @@ PetscErrorCode refine_receiving_area(EMContext *ctx) {
       break;
     }
 
-    refine_flag.resize(ctx->original_mesh->n_tets());
+    refine_flag.resize(ctx->mesh->n_tets());
     std::fill(refine_flag.begin(), refine_flag.end(), false);
 
     flg = false;
     for (i = 0; i < (int)ctx->rx.size(); ++i) {
-      t = ctx->original_mesh->find_cell_around_point(ctx->rx[i]);
+      t = ctx->mesh->find_cell_around_point(ctx->rx[i]);
       if (t < 0) {
         SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Receiver %d is not found in mesh.", i).c_str());
       }
-      if (TetAccessor(ctx->original_mesh.get(), t).volume() > std::pow(ctx->max_rx_edge_length, 3)) {
+      if (TetAccessor(ctx->mesh.get(), t).volume() > std::pow(ctx->max_rx_edge_length, 3)) {
         flg = true;
         refine_flag[t] = true;
       }
@@ -982,7 +1023,7 @@ PetscErrorCode refine_receiving_area(EMContext *ctx) {
       break;
     }
 
-    ctx->original_mesh->refine_tetgen(refine_flag);
+    ctx->mesh->refine_tetgen(refine_flag);
   }
 
   PetscFunctionReturn(0);
@@ -1362,7 +1403,10 @@ PetscErrorCode forward_mt(EMContext *ctx, int fidx) {
   ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz:\n", ctx->freqs[fidx]); CHKERRQ(ierr);
   ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
 
-  ctx->mesh->copy(*ctx->original_mesh);
+  ctx->mesh->copy(*ctx->coarse_mesh);
+
+  ierr = refine_rx_area(ctx); CHKERRQ(ierr);
+  ierr = refine_uniform(ctx); CHKERRQ(ierr);
 
   for (cycle = 0; cycle < ctx->max_adaptive_refinements + 1; ++cycle) {
     LogStageHelper freq_refine_lsh(string_format("Freq-%d-Refine-%d", fidx, cycle));
@@ -1422,7 +1466,11 @@ PetscErrorCode forward_csem(EMContext *ctx, int fidx, int tidx) {
   ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz, TX %d:\n", ctx->freqs[fidx], tidx); CHKERRQ(ierr);
   ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
 
-  ctx->mesh->copy(*ctx->original_mesh);
+  ctx->mesh->copy(*ctx->coarse_mesh);
+
+  ierr = refine_tx_area(ctx, tidx); CHKERRQ(ierr);
+  ierr = refine_rx_area(ctx); CHKERRQ(ierr);
+  ierr = refine_uniform(ctx); CHKERRQ(ierr);
 
   for (cycle = 0; cycle < ctx->max_adaptive_refinements + 1; ++cycle) {
     LogStageHelper freq_refine_lsh(string_format("Freq-%d-TX-%d-Refine-%d", fidx, tidx, cycle));
@@ -1482,10 +1530,6 @@ PetscErrorCode em_forward(EMContext *ctx) {
     ierr = read_mesh(ctx); CHKERRQ(ierr);
   }
   ierr = read_emd(ctx); CHKERRQ(ierr);
-
-  ierr = refine_receiving_area(ctx); CHKERRQ(ierr);
-
-  ierr = refine_uniform(ctx); CHKERRQ(ierr);
 
   ierr = update_background_model(ctx); CHKERRQ(ierr);
 

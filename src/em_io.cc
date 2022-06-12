@@ -145,7 +145,7 @@ PetscErrorCode read_mdl(EMContext *ctx) {
     in.regionlist[i * 5 + 4] = std::pow(in.regionlist[i * 5 + 4], 3);
   }
 
-  ctx->original_mesh->create(&in);
+  ctx->coarse_mesh->create(&in);
 
   read_rho(ctx, ss);
 
@@ -192,7 +192,7 @@ PetscErrorCode read_mesh(EMContext *ctx) {
     ss >> in.tetrahedronattributelist[i];
   }
 
-  ctx->original_mesh->create(&in);
+  ctx->coarse_mesh->create(&in);
 
   read_rho(ctx, ss);
 

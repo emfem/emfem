@@ -26,7 +26,7 @@ struct EMContext {
   Point top_corners[4];
   Eigen::VectorXd ztop[4], lsig[4];
 
-  std::shared_ptr<Mesh> original_mesh, mesh;
+  std::shared_ptr<Mesh> coarse_mesh, mesh;
 
   std::vector<int> relevant_edges;
   std::pair<int, int> local_vertices, local_edges;
@@ -54,7 +54,7 @@ struct EMContext {
 
   PetscBool use_ams, save_mesh;
   char iprefix[256], oprefix[256];
-  PetscReal max_rx_edge_length, refine_fraction, e_rtol, dual_rtol;
+  PetscReal max_tx_edge_length, max_rx_edge_length, refine_fraction, e_rtol, dual_rtol;
   PetscInt max_adaptive_refinements, n_uniform_refinements, max_dofs, refine_strategy, n_groups,
       K_max_it, pc_threshold, inner_pc_type, direct_solver_type, mesh_format, n_tx_divisions;
 

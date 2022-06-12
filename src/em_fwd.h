@@ -38,7 +38,8 @@ PetscErrorCode interpolate_fields(EMContext *, const TetAccessor &, const Point 
                                   VectorZ &, VectorZ &);
 PetscErrorCode calculate_response(EMContext *, int);
 
-PetscErrorCode refine_receiving_area(EMContext *);
+PetscErrorCode refine_tx_area(EMContext *, int);
+PetscErrorCode refine_rx_area(EMContext *);
 
 PetscErrorCode integrate_over_cell(EMContext *, const TetAccessor &, int ,
                                    const std::vector<PETScBlockVector *> &, std::vector<Eigen::VectorXd> &);

@@ -43,7 +43,7 @@ PetscErrorCode create_context(EMContext *ctx) {
   ierr = MPI_Comm_size(ctx->group_comm, &ctx->group_size); CHKERRQ(ierr);
   ierr = MPI_Comm_rank(ctx->group_comm, &ctx->group_rank); CHKERRQ(ierr);
 
-  ctx->original_mesh.reset(new Mesh(ctx->group_comm));
+  ctx->coarse_mesh.reset(new Mesh(ctx->group_comm));
   ctx->mesh.reset(new Mesh(ctx->group_comm));
 
   ctx->C = NULL;
@@ -125,7 +125,10 @@ PetscErrorCode process_options(EMContext *ctx) {
   ctx->n_groups = 1;
   ierr = PetscOptionsGetInt(NULL, NULL, "-n_groups", &ctx->n_groups, &flg); CHKERRQ(ierr);
 
-  ctx->max_rx_edge_length = 1000;
+  ctx->max_tx_edge_length = -1;
+  ierr = PetscOptionsGetReal(NULL, NULL, "-max_tx_edge_length", &ctx->max_tx_edge_length, &flg); CHKERRQ(ierr);
+
+  ctx->max_rx_edge_length = -1;
   ierr = PetscOptionsGetReal(NULL, NULL, "-max_rx_edge_length", &ctx->max_rx_edge_length, &flg); CHKERRQ(ierr);
 
   ctx->mesh_format = MDL;
