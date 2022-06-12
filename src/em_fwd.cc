@@ -645,14 +645,49 @@ PetscErrorCode assemble_rhs_mt(EMContext *ctx, int fidx, int mode) {
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode divide_line_source(const double *tx, int n_tx_divisions,
+                                  std::vector<std::tuple<Point, VectorD, double, double>> &dipoles) {
+  int i;
+  Point A, B;
+  double length, current;
+  VectorD direction, center;
+
+  PetscFunctionBegin;
+
+  center[0] = tx[0];
+  center[1] = tx[1];
+  center[2] = tx[2];
+
+  direction[0] = std::cos(tx[3] * DTOR) * std::cos(tx[4] * DTOR);
+  direction[1] = std::sin(tx[3] * DTOR) * std::cos(tx[4] * DTOR);
+  direction[2] = std::sin(tx[4] * DTOR);
+
+  current = tx[5];
+  length = tx[6];
+
+  if (std::abs(tx[6]) <= 0.1) {
+    dipoles.push_back(std::make_tuple(center, direction, current, 1.0));
+  } else {
+    A = center - direction * length / 2;
+    for (i = 0; i < n_tx_divisions; ++i) {
+      B = A + direction * length / n_tx_divisions;
+      dipoles.push_back(std::make_tuple((A + B) / 2, direction, current, 1.0 / n_tx_divisions));
+      A = B;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
-  int i, t;
-  Point tx_coord;
+  int i, j, t;
+  Point center;
+  VectorD direction;
   PetscErrorCode ierr;
-  VectorD tx_direction;
-  PetscReal omega, current;
+  PetscReal omega, current, weight;
   std::vector<PetscInt> dof_indices;
   Eigen::Matrix<PetscReal, EDGES_PER_TET, 1> b_re, b_im;
+  std::vector<std::tuple<Point, VectorD, double, double>> dipoles;
 
   FEValues fv;
   TetAccessor cell;
@@ -662,39 +697,38 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
   LogEventHelper leh(ctx->AssembleRHS);
 
   omega = 2 * PI * ctx->freqs[fidx];
-  current = ctx->tx[tidx * TX_SIZE + 5];
 
-  tx_coord[0] = ctx->tx[tidx * TX_SIZE + 0];
-  tx_coord[1] = ctx->tx[tidx * TX_SIZE + 1];
-  tx_coord[2] = ctx->tx[tidx * TX_SIZE + 2];
-
-  tx_direction[0] = std::cos(ctx->tx[tidx * TX_SIZE + 3] * DTOR) * std::cos(ctx->tx[tidx * TX_SIZE + 4] * DTOR);
-  tx_direction[1] = std::sin(ctx->tx[tidx * TX_SIZE + 3] * DTOR) * std::cos(ctx->tx[tidx * TX_SIZE + 4] * DTOR);
-  tx_direction[2] = std::sin(ctx->tx[tidx * TX_SIZE + 4] * DTOR);
+  divide_line_source(&ctx->tx[tidx * TX_SIZE], ctx->n_tx_divisions, dipoles);
 
   ierr = VecZeroEntries(ctx->s.re); CHKERRQ(ierr);
   ierr = VecZeroEntries(ctx->s.im); CHKERRQ(ierr);
 
-  t = ctx->mesh->find_cell_around_point(tx_coord);
-  if (t < 0) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d is not found in mesh.", tidx).c_str());
-  }
-  cell = TetAccessor(ctx->mesh.get(), t);
+  for (j = 0; j < dipoles.size(); ++j) {
+    center = std::get<0>(dipoles[j]);
+    direction = std::get<1>(dipoles[j]);
+    current = std::get<2>(dipoles[j]);
+    weight = std::get<3>(dipoles[j]);
 
-  if (cell.is_locally_owned()) {
-    fv.reinit(cell);
-    fv.get_cell_dof_indices(dof_indices);
-
-    b_re.setZero();
-    b_im.setZero();
-    for (i = 0; i < EDGES_PER_TET; ++i) {
-      b_im[i] = omega * current * fv.value_nedelec(i, tx_coord).dot(tx_direction);
+    t = ctx->mesh->find_cell_around_point(center);
+    if (t < 0) {
+      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d is not found in mesh.", tidx).c_str());
     }
+    cell = TetAccessor(ctx->mesh.get(), t);
 
-    ierr = VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES); CHKERRQ(ierr);
-    ierr = VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES); CHKERRQ(ierr);
+    if (cell.is_locally_owned()) {
+      fv.reinit(cell);
+      fv.get_cell_dof_indices(dof_indices);
+
+      b_re.setZero();
+      b_im.setZero();
+      for (i = 0; i < EDGES_PER_TET; ++i) {
+        b_im[i] = omega * current * fv.value_nedelec(i, center).dot(direction) * weight;
+      }
+
+      ierr = VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES); CHKERRQ(ierr);
+      ierr = VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES); CHKERRQ(ierr);
+    }
   }
-
   ierr = VecAssemblyBegin(ctx->s.re); CHKERRQ(ierr);
   ierr = VecAssemblyEnd(ctx->s.re); CHKERRQ(ierr);
   ierr = VecAssemblyBegin(ctx->s.im); CHKERRQ(ierr);

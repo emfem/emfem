@@ -56,7 +56,7 @@ struct EMContext {
   char iprefix[256], oprefix[256];
   PetscReal max_rx_edge_length, refine_fraction, e_rtol, dual_rtol;
   PetscInt max_adaptive_refinements, n_uniform_refinements, max_dofs, refine_strategy, n_groups,
-      K_max_it, pc_threshold, inner_pc_type, direct_solver_type, mesh_format;
+      K_max_it, pc_threshold, inner_pc_type, direct_solver_type, mesh_format, n_tx_divisions;
 
   PetscClassId EMCTX_ID;
   PetscLogEvent CreateLS, AssembleMat, AssembleRHS, SetupAMS, CreatePC, SolveLS, EstimateError,

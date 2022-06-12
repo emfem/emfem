@@ -26,6 +26,9 @@ PetscErrorCode update_background_model(EMContext *);
 
 PetscErrorCode calculate_boundary_values(EMContext *, int, int, std::map<int, Complex> &);
 
+PetscErrorCode divide_line_source(const double *, int,
+                                  std::vector<std::tuple<Point, VectorD, double, double>> &);
+
 PetscErrorCode assemble_matrix(EMContext *, int);
 PetscErrorCode assemble_rhs_mt(EMContext *, int, int);
 PetscErrorCode assemble_rhs_csem(EMContext *, int, int);

@@ -167,6 +167,9 @@ PetscErrorCode process_options(EMContext *ctx) {
   ctx->save_mesh = PETSC_TRUE;
   ierr = PetscOptionsGetBool(NULL, NULL, "-save_mesh", &ctx->save_mesh, &flg); CHKERRQ(ierr);
 
+  ctx->n_tx_divisions = 20;
+  ierr = PetscOptionsGetInt(NULL, NULL, "-n_tx_divisions", &ctx->n_tx_divisions, &flg); CHKERRQ(ierr);
+
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
