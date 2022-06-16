@@ -46,9 +46,13 @@ public:
 
   void refine_uniform();
 
-  void get_vertex_owners(std::vector<int> &);
+  void get_vertex_owners(std::vector<int> &) const;
 
-  void get_edge_owners(std::vector<int> &);
+  void get_edge_owners(std::vector<int> &) const;
+
+  std::pair<int, int> get_local_vertices() const { return local_vertices_; };
+
+  std::pair<int, int> get_local_edges() const { return local_edges_; };
 
   void save_vtk(const char *, const std::map<std::string, Eigen::VectorXd> &);
 
@@ -115,6 +119,7 @@ private:
 
   std::vector<bool> vertex_bdr_marker_, edge_bdr_marker_, ghost_flag_;
   std::vector<int> tet_non_, subdomain_, new_edge_indices_, new_vertex_indices_, vertex_to_tet_;
+  std::pair<int, int> local_vertices_, local_edges_;
 
   std::shared_ptr<KDTree> kd_index_;
 

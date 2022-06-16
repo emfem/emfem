@@ -160,66 +160,6 @@ PetscErrorCode update_background_model(EMContext *ctx) {
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode extract_locally_owned_vertices(EMContext *ctx) {
-  int v, begin, end;
-  std::vector<int> owners;
-
-  PetscFunctionBegin;
-
-  ctx->mesh->get_vertex_owners(owners);
-
-  begin = std::numeric_limits<int>::max();
-  end = std::numeric_limits<int>::min();
-
-  for (v = 0; v < ctx->mesh->n_vertices(); ++v) {
-    if (owners[v] == ctx->group_rank) {
-      begin = std::min(begin, v);
-      end = std::max(end, v);
-    }
-  }
-
-  if (begin > end) {
-    begin = end = -1;
-  } else {
-    end += 1;
-  }
-
-  ctx->local_vertices.first = begin;
-  ctx->local_vertices.second = end;
-
-  PetscFunctionReturn(0);
-}
-
-PetscErrorCode extract_locally_owned_edges(EMContext *ctx) {
-  int e, begin, end;
-  std::vector<int> owners;
-
-  PetscFunctionBegin;
-
-  ctx->mesh->get_edge_owners(owners);
-
-  begin = std::numeric_limits<int>::max();
-  end = std::numeric_limits<int>::min();
-
-  for (e = 0; e < ctx->mesh->n_edges(); ++e) {
-    if (owners[e] == ctx->group_rank) {
-      begin = std::min(begin, e);
-      end = std::max(end, e);
-    }
-  }
-
-  if (begin > end) {
-    begin = end = -1;
-  } else {
-    end += 1;
-  }
-
-  ctx->local_edges.first = begin;
-  ctx->local_edges.second = end;
-
-  PetscFunctionReturn(0);
-}
-
 PetscErrorCode extract_locally_relevant_edges(EMContext *ctx) {
   int t, e;
   TetAccessor cell;
@@ -316,8 +256,9 @@ PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
 
   LogEventHelper leh(ctx->CreateLS);
 
-  ierr = extract_locally_owned_vertices(ctx); CHKERRQ(ierr);
-  ierr = extract_locally_owned_edges(ctx); CHKERRQ(ierr);
+  ctx->local_edges = ctx->mesh->get_local_edges();
+  ctx->local_vertices = ctx->mesh->get_local_vertices();
+
   ierr = extract_locally_relevant_edges(ctx); CHKERRQ(ierr);
   ierr = make_sparsity_patterns(ctx, rptr, cidx); CHKERRQ(ierr);
 

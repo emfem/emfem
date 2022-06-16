@@ -304,7 +304,7 @@ void Mesh::partition() {
   compute_new_edge_indices();
 }
 
-void Mesh::get_vertex_owners(std::vector<int> &owners) {
+void Mesh::get_vertex_owners(std::vector<int> &owners) const {
   int t, v;
   bool coin_flip;
 
@@ -326,7 +326,7 @@ void Mesh::get_vertex_owners(std::vector<int> &owners) {
   }
 }
 
-void Mesh::get_edge_owners(std::vector<int> &owners) {
+void Mesh::get_edge_owners(std::vector<int> &owners) const {
   int t, e;
   bool coin_flip;
 
@@ -363,6 +363,22 @@ void Mesh::compute_new_vertex_indices() {
       }
     }
   }
+
+  local_vertices_.first = std::numeric_limits<int>::max();
+  local_vertices_.second = std::numeric_limits<int>::min();
+
+  for (v = 0; v < n_vertices(); ++v) {
+    if (owners[v] == comm_rank_) {
+      local_vertices_.first = std::min(local_vertices_.first, new_vertex_indices_[v]);
+      local_vertices_.second = std::max(local_vertices_.second, new_vertex_indices_[v]);
+    }
+  }
+
+  if (local_vertices_.first > local_vertices_.second) {
+    local_vertices_.first = local_vertices_.second = -1;
+  } else {
+    local_vertices_.second += 1;
+  }
 }
 
 void Mesh::compute_new_edge_indices() {
@@ -379,6 +395,22 @@ void Mesh::compute_new_edge_indices() {
         new_edge_indices_[e] = next_free_index++;
       }
     }
+  }
+
+  local_edges_.first = std::numeric_limits<int>::max();
+  local_edges_.second = std::numeric_limits<int>::min();
+
+  for (e = 0; e < n_edges(); ++e) {
+    if (owners[e] == comm_rank_) {
+      local_edges_.first = std::min(local_edges_.first, new_edge_indices_[e]);
+      local_edges_.second = std::max(local_edges_.second, new_edge_indices_[e]);
+    }
+  }
+
+  if (local_edges_.first > local_edges_.second) {
+    local_edges_.first = local_edges_.second = -1;
+  } else {
+    local_edges_.second += 1;
   }
 }
 
