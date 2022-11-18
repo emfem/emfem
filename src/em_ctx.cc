@@ -110,7 +110,7 @@ PetscErrorCode process_options(EMContext *ctx) {
 
   PetscFunctionBegin;
 
-  ierr = PetscOptionsBegin(MPI_COMM_WORLD, "", "EMFEM options", ""); CHKERRQ(ierr);
+  PetscOptionsBegin(MPI_COMM_WORLD, "", "EMFEM options", "");
 
   ierr = PetscOptionsGetString(NULL, NULL, "-iprefix", ctx->iprefix, sizeof(ctx->iprefix), &flg); CHKERRQ(ierr);
   if (!flg) {
@@ -173,7 +173,7 @@ PetscErrorCode process_options(EMContext *ctx) {
   ctx->n_tx_divisions = 20;
   ierr = PetscOptionsGetInt(NULL, NULL, "-n_tx_divisions", &ctx->n_tx_divisions, &flg); CHKERRQ(ierr);
 
-  ierr = PetscOptionsEnd(); CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   PetscFunctionReturn(0);
 }
