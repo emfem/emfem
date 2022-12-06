@@ -78,7 +78,6 @@ PetscErrorCode generate_layered_model(EMContext *ctx, const Point &tl, const Poi
   Tensor sigma;
   int v, t, i, n;
   TetAccessor cell;
-  PetscErrorCode ierr;
   std::vector<double> z, sig;
 
   PetscFunctionBegin;
@@ -91,7 +90,7 @@ PetscErrorCode generate_layered_model(EMContext *ctx, const Point &tl, const Poi
 
     cell = TetAccessor(ctx->coarse_mesh.get(), t);
 
-    ierr = get_cell_attribute(ctx, cell, sigma); CHKERRQ(ierr);
+    PetscCall(get_cell_attribute(ctx, cell, sigma));
 
     z.push_back(fp[2]);
     sig.push_back(sigma.diagonal().mean());
@@ -134,7 +133,6 @@ PetscErrorCode generate_layered_model(EMContext *ctx, const Point &tl, const Poi
 }
 
 PetscErrorCode update_background_model(EMContext *ctx) {
-  PetscErrorCode ierr;
   Point p, top_left, bottom_right;
 
   PetscFunctionBegin;
@@ -146,16 +144,16 @@ PetscErrorCode update_background_model(EMContext *ctx) {
   bottom_right = std::get<0>(ctx->coarse_mesh->find_closest_vertex(p));
 
   ctx->top_corners[0] = Point(top_left[0], top_left[1], top_left[2]);
-  ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[0], ctx->ztop[0], ctx->lsig[0]); CHKERRQ(ierr);
+  PetscCall(generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[0], ctx->ztop[0], ctx->lsig[0]));
 
   ctx->top_corners[1] = Point(bottom_right[0], top_left[1], top_left[2]);
-  ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[1], ctx->ztop[1], ctx->lsig[1]); CHKERRQ(ierr);
+  PetscCall(generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[1], ctx->ztop[1], ctx->lsig[1]));
 
   ctx->top_corners[2] = Point(bottom_right[0], bottom_right[1], top_left[2]);
-  ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[2], ctx->ztop[2], ctx->lsig[2]); CHKERRQ(ierr);
+  PetscCall(generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[2], ctx->ztop[2], ctx->lsig[2]));
 
   ctx->top_corners[3] = Point(top_left[0], bottom_right[1], top_left[2]);
-  ierr = generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[3], ctx->ztop[3], ctx->lsig[3]); CHKERRQ(ierr);
+  PetscCall(generate_layered_model(ctx, top_left, bottom_right, ctx->top_corners[3], ctx->ztop[3], ctx->lsig[3]));
 
   PetscFunctionReturn(0);
 }
@@ -249,7 +247,6 @@ PetscErrorCode make_sparsity_patterns(EMContext *ctx, std::vector<PetscInt> &rpt
 
 PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
   int nrow;
-  PetscErrorCode ierr;
   std::vector<PetscInt> rptr, cidx;
 
   PetscFunctionBegin;
@@ -259,28 +256,28 @@ PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
   ctx->local_edges = ctx->mesh->get_local_edges();
   ctx->local_vertices = ctx->mesh->get_local_vertices();
 
-  ierr = extract_locally_relevant_edges(ctx); CHKERRQ(ierr);
-  ierr = make_sparsity_patterns(ctx, rptr, cidx); CHKERRQ(ierr);
+  PetscCall(extract_locally_relevant_edges(ctx));
+  PetscCall(make_sparsity_patterns(ctx, rptr, cidx));
 
   nrow = ctx->local_edges.second - ctx->local_edges.first;
 
-  ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, nrow, nrow, PETSC_DECIDE, PETSC_DECIDE, &rptr[0], &cidx[0], NULL, &ctx->C); CHKERRQ(ierr);
-  ierr = MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->M); CHKERRQ(ierr);
+  PetscCall(MatCreateMPIAIJWithArrays(ctx->group_comm, nrow, nrow, PETSC_DECIDE, PETSC_DECIDE, &rptr[0], &cidx[0], NULL, &ctx->C));
+  PetscCall(MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->M));
 
-  ierr = VecCreateMPI(ctx->group_comm, nrow, PETSC_DECIDE, &ctx->s.re); CHKERRQ(ierr);
-  ierr = VecDuplicate(ctx->s.re, &ctx->s.im); CHKERRQ(ierr);
-  ierr = VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->dual_e.re); CHKERRQ(ierr);
-  ierr = VecDuplicate(ctx->dual_e.re, &ctx->dual_e.im); CHKERRQ(ierr);
+  PetscCall(VecCreateMPI(ctx->group_comm, nrow, PETSC_DECIDE, &ctx->s.re));
+  PetscCall(VecDuplicate(ctx->s.re, &ctx->s.im));
+  PetscCall(VecCreateGhost(ctx->group_comm, nrow, PETSC_DECIDE, (PetscInt)ctx->relevant_edges.size(), &ctx->relevant_edges[0], &ctx->dual_e.re));
+  PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->dual_e.im));
   if (tidx < 0) {
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].re); CHKERRQ(ierr);
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].im); CHKERRQ(ierr);
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].re); CHKERRQ(ierr);
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].im); CHKERRQ(ierr);
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].re));
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->mt_e[XY_POLAR].im));
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].re));
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->mt_e[YX_POLAR].im));
   } else {
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->csem_e.re); CHKERRQ(ierr);
-    ierr = VecDuplicate(ctx->dual_e.re, &ctx->csem_e.im); CHKERRQ(ierr);
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->csem_e.re));
+    PetscCall(VecDuplicate(ctx->dual_e.re, &ctx->csem_e.im));
   }
-  ierr = VecDuplicate(ctx->s.re, &ctx->w); CHKERRQ(ierr);
+  PetscCall(VecDuplicate(ctx->s.re, &ctx->w));
 
   if ((InnerPCType)ctx->inner_pc_type == Mixed) {
     if (ctx->mesh->n_edges() > ctx->pc_threshold) {
@@ -298,24 +295,22 @@ PetscErrorCode create_linear_system(EMContext *ctx, int tidx) {
 }
 
 PetscErrorCode destroy_linear_system(EMContext *ctx) {
-  PetscErrorCode ierr;
-
   PetscFunctionBegin;
 
-  ierr = MatDestroy(&ctx->C); CHKERRQ(ierr);
-  ierr = MatDestroy(&ctx->M); CHKERRQ(ierr);
+  PetscCall(MatDestroy(&ctx->C));
+  PetscCall(MatDestroy(&ctx->M));
 
-  ierr = VecDestroy(&ctx->s.re); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->s.im); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->csem_e.re); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->csem_e.im); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->dual_e.re); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->dual_e.im); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->mt_e[XY_POLAR].re); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->mt_e[XY_POLAR].im); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->mt_e[YX_POLAR].re); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->mt_e[YX_POLAR].im); CHKERRQ(ierr);
-  ierr = VecDestroy(&ctx->w); CHKERRQ(ierr);
+  PetscCall(VecDestroy(&ctx->s.re));
+  PetscCall(VecDestroy(&ctx->s.im));
+  PetscCall(VecDestroy(&ctx->csem_e.re));
+  PetscCall(VecDestroy(&ctx->csem_e.im));
+  PetscCall(VecDestroy(&ctx->dual_e.re));
+  PetscCall(VecDestroy(&ctx->dual_e.im));
+  PetscCall(VecDestroy(&ctx->mt_e[XY_POLAR].re));
+  PetscCall(VecDestroy(&ctx->mt_e[XY_POLAR].im));
+  PetscCall(VecDestroy(&ctx->mt_e[YX_POLAR].re));
+  PetscCall(VecDestroy(&ctx->mt_e[YX_POLAR].im));
+  PetscCall(VecDestroy(&ctx->w));
 
   PetscFunctionReturn(0);
 }
@@ -324,7 +319,6 @@ PetscErrorCode assemble_matrix(EMContext *ctx, int fidx) {
   double omega;
   Tensor sigma;
   int i, j, t, q;
-  PetscErrorCode ierr;
   std::vector<PetscInt> dof_indices;
   Eigen::Matrix<PetscReal, EDGES_PER_TET, EDGES_PER_TET> c_cell_matrix, m_cell_matrix;
 
@@ -343,8 +337,8 @@ PetscErrorCode assemble_matrix(EMContext *ctx, int fidx) {
 
   calculate_ref_cell_quadrature_points(2, ref_qpoints, weights);
 
-  ierr = MatZeroEntries(ctx->C); CHKERRQ(ierr);
-  ierr = MatZeroEntries(ctx->M); CHKERRQ(ierr);
+  PetscCall(MatZeroEntries(ctx->C));
+  PetscCall(MatZeroEntries(ctx->M));
 
   for (t = 0; t < ctx->mesh->n_tets(); ++t) {
     cell = TetAccessor(ctx->mesh.get(), t);
@@ -393,14 +387,14 @@ PetscErrorCode assemble_matrix(EMContext *ctx, int fidx) {
       }
     }
 
-    ierr = MatSetValues(ctx->C, EDGES_PER_TET, &dof_indices[0], EDGES_PER_TET, &dof_indices[0], &c_cell_matrix(0, 0), ADD_VALUES); CHKERRQ(ierr);
-    ierr = MatSetValues(ctx->M, EDGES_PER_TET, &dof_indices[0], EDGES_PER_TET, &dof_indices[0], &m_cell_matrix(0, 0), ADD_VALUES); CHKERRQ(ierr);
+    PetscCall(MatSetValues(ctx->C, EDGES_PER_TET, &dof_indices[0], EDGES_PER_TET, &dof_indices[0], &c_cell_matrix(0, 0), ADD_VALUES));
+    PetscCall(MatSetValues(ctx->M, EDGES_PER_TET, &dof_indices[0], EDGES_PER_TET, &dof_indices[0], &m_cell_matrix(0, 0), ADD_VALUES));
   }
 
-  ierr = MatAssemblyBegin(ctx->C, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(ctx->C, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(ctx->M, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(ctx->M, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+  PetscCall(MatAssemblyBegin(ctx->C, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(ctx->C, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyBegin(ctx->M, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(ctx->M, MAT_FINAL_ASSEMBLY));
 
   PetscFunctionReturn(0);
 }
@@ -494,7 +488,6 @@ PetscErrorCode calculate_boundary_values(EMContext *ctx, int fidx, int mode,
 PetscErrorCode assemble_rhs_mt(EMContext *ctx, int fidx, int mode) {
   int i, j, q;
   Tensor sigma;
-  PetscErrorCode ierr;
   double omega, bv_re, bv_im;
   std::set<int>::iterator it;
   std::map<int, Complex> bdr_values;
@@ -515,10 +508,10 @@ PetscErrorCode assemble_rhs_mt(EMContext *ctx, int fidx, int mode) {
 
   calculate_ref_cell_quadrature_points(2, ref_qpoints, weights);
 
-  ierr = calculate_boundary_values(ctx, fidx, mode, bdr_values); CHKERRQ(ierr);
+  PetscCall(calculate_boundary_values(ctx, fidx, mode, bdr_values));
 
-  ierr = VecZeroEntries(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecZeroEntries(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecZeroEntries(ctx->s.re));
+  PetscCall(VecZeroEntries(ctx->s.im));
 
   for (it = ctx->bdr_cells.begin(); it != ctx->bdr_cells.end(); ++it) {
     cell = TetAccessor(ctx->mesh.get(), *it);
@@ -574,14 +567,14 @@ PetscErrorCode assemble_rhs_mt(EMContext *ctx, int fidx, int mode) {
       }
     }
 
-    ierr = VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES); CHKERRQ(ierr);
-    ierr = VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES); CHKERRQ(ierr);
+    PetscCall(VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES));
+    PetscCall(VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES));
   }
 
-  ierr = VecAssemblyBegin(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyBegin(ctx->s.im); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecAssemblyBegin(ctx->s.re));
+  PetscCall(VecAssemblyEnd(ctx->s.re));
+  PetscCall(VecAssemblyBegin(ctx->s.im));
+  PetscCall(VecAssemblyEnd(ctx->s.im));
 
   PetscFunctionReturn(0);
 }
@@ -624,7 +617,6 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
   int i, j, t;
   Point center;
   VectorD direction;
-  PetscErrorCode ierr;
   PetscReal omega, current, weight;
   std::vector<PetscInt> dof_indices;
   Eigen::Matrix<PetscReal, EDGES_PER_TET, 1> b_re, b_im;
@@ -641,8 +633,8 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
 
   divide_line_source(&ctx->tx[tidx * TX_SIZE], ctx->n_tx_divisions, dipoles);
 
-  ierr = VecZeroEntries(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecZeroEntries(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecZeroEntries(ctx->s.re));
+  PetscCall(VecZeroEntries(ctx->s.im));
 
   for (j = 0; j < dipoles.size(); ++j) {
     center = std::get<0>(dipoles[j]);
@@ -666,21 +658,20 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
         b_im[i] = omega * current * fv.value_nedelec(i, center).dot(direction) * weight;
       }
 
-      ierr = VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES); CHKERRQ(ierr);
-      ierr = VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES); CHKERRQ(ierr);
+      PetscCall(VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES));
+      PetscCall(VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES));
     }
   }
-  ierr = VecAssemblyBegin(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyBegin(ctx->s.im); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecAssemblyBegin(ctx->s.re));
+  PetscCall(VecAssemblyEnd(ctx->s.re));
+  PetscCall(VecAssemblyBegin(ctx->s.im));
+  PetscCall(VecAssemblyEnd(ctx->s.im));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode assemble_rhs_dual(EMContext *ctx) {
   int i, j, t;
-  PetscErrorCode ierr;
   std::vector<PetscInt> dof_indices;
   Eigen::Matrix<PetscReal, EDGES_PER_TET, 1> b_re, b_im;
 
@@ -691,8 +682,8 @@ PetscErrorCode assemble_rhs_dual(EMContext *ctx) {
 
   LogEventHelper leh(ctx->AssembleRHS);
 
-  ierr = VecZeroEntries(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecZeroEntries(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecZeroEntries(ctx->s.re));
+  PetscCall(VecZeroEntries(ctx->s.im));
 
   for (i = 0; i < (int)ctx->rx.size(); ++i) {
     t = ctx->mesh->find_cell_around_point(ctx->rx[i]);
@@ -713,14 +704,14 @@ PetscErrorCode assemble_rhs_dual(EMContext *ctx) {
       b_im[j] = fv.value_nedelec(j, ctx->rx[i]).sum();
     }
 
-    ierr = VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES); CHKERRQ(ierr);
-    ierr = VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES); CHKERRQ(ierr);
+    PetscCall(VecSetValues(ctx->s.re, EDGES_PER_TET, &dof_indices[0], &b_re[0], ADD_VALUES));
+    PetscCall(VecSetValues(ctx->s.im, EDGES_PER_TET, &dof_indices[0], &b_im[0], ADD_VALUES));
   }
 
-  ierr = VecAssemblyBegin(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.re); CHKERRQ(ierr);
-  ierr = VecAssemblyBegin(ctx->s.im); CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(ctx->s.im); CHKERRQ(ierr);
+  PetscCall(VecAssemblyBegin(ctx->s.re));
+  PetscCall(VecAssemblyEnd(ctx->s.re));
+  PetscCall(VecAssemblyBegin(ctx->s.im));
+  PetscCall(VecAssemblyEnd(ctx->s.im));
 
   PetscFunctionReturn(0);
 }
@@ -729,7 +720,6 @@ PetscErrorCode interpolate_fields(EMContext *ctx, const TetAccessor &cell, const
                                   double freq, const PETScBlockVector &e, VectorZ &es, VectorZ &hs) {
   FEValues fv;
   int i, eidx;
-  PetscErrorCode ierr;
   PetscReal v_re, v_im;
   std::vector<PetscInt> indices;
 
@@ -743,8 +733,8 @@ PetscErrorCode interpolate_fields(EMContext *ctx, const TetAccessor &cell, const
 
   for (i = 0; i < EDGES_PER_TET; ++i) {
     eidx = indices[i];
-    ierr = access_vec(e.re, ctx->relevant_edges, eidx, &v_re); CHKERRQ(ierr);
-    ierr = access_vec(e.im, ctx->relevant_edges, eidx, &v_im); CHKERRQ(ierr);
+    PetscCall(access_vec(e.re, ctx->relevant_edges, eidx, &v_re));
+    PetscCall(access_vec(e.im, ctx->relevant_edges, eidx, &v_im));
 
     es += Complex(v_re, v_im) * fv.value_nedelec(i, p);
     hs += -1.0 / (II * 2.0 * PI * freq * MU) * Complex(v_re, v_im) * fv.curl_nedelec(i, p);
@@ -973,7 +963,6 @@ PetscErrorCode refine_rx_area(EMContext *ctx) {
 PetscErrorCode calculate_function_value(EMContext *ctx, const FEValues &fv, const Point &p, const PETScBlockVector &f, VectorZ &e) {
   int i, eidx;
   double v_re, v_im;
-  PetscErrorCode ierr;
   std::vector<PetscInt> indices;
 
   PetscFunctionBegin;
@@ -983,8 +972,8 @@ PetscErrorCode calculate_function_value(EMContext *ctx, const FEValues &fv, cons
   e.setZero();
   for (i = 0; i < EDGES_PER_TET; ++i) {
     eidx = indices[i];
-    ierr = access_vec(f.re, ctx->relevant_edges, eidx, &v_re); CHKERRQ(ierr);
-    ierr = access_vec(f.im, ctx->relevant_edges, eidx, &v_im); CHKERRQ(ierr);
+    PetscCall(access_vec(f.re, ctx->relevant_edges, eidx, &v_re));
+    PetscCall(access_vec(f.im, ctx->relevant_edges, eidx, &v_im));
 
     e += Complex(v_re, v_im) * fv.value_nedelec(i, p);
   }
@@ -995,7 +984,6 @@ PetscErrorCode calculate_function_value(EMContext *ctx, const FEValues &fv, cons
 PetscErrorCode calculate_function_curl(EMContext *ctx, const FEValues &fv, const Point &p, const PETScBlockVector &f, VectorZ &ce) {
   int i, eidx;
   double v_re, v_im;
-  PetscErrorCode ierr;
   std::vector<PetscInt> indices;
 
   PetscFunctionBegin;
@@ -1005,8 +993,8 @@ PetscErrorCode calculate_function_curl(EMContext *ctx, const FEValues &fv, const
   ce.setZero();
   for (i = 0; i < EDGES_PER_TET; ++i) {
     eidx = indices[i];
-    ierr = access_vec(f.re, ctx->relevant_edges, eidx, &v_re); CHKERRQ(ierr);
-    ierr = access_vec(f.im, ctx->relevant_edges, eidx, &v_im); CHKERRQ(ierr);
+    PetscCall(access_vec(f.re, ctx->relevant_edges, eidx, &v_re));
+    PetscCall(access_vec(f.im, ctx->relevant_edges, eidx, &v_im));
 
     ce += Complex(v_re, v_im) * fv.curl_nedelec(i, p);
   }
@@ -1020,7 +1008,6 @@ PetscErrorCode integrate_over_cell(EMContext *ctx, const TetAccessor &cell, int 
   VectorZ e;
   FEValues fv;
   Tensor sigma;
-  PetscErrorCode ierr;
   double diameter, omega;
   std::vector<Point> ref_qpoints, qpoints;
   std::vector<double> weights, jxw, residuals;
@@ -1029,7 +1016,7 @@ PetscErrorCode integrate_over_cell(EMContext *ctx, const TetAccessor &cell, int 
 
   omega = 2 * PI * ctx->freqs[fidx];
 
-  ierr = get_cell_attribute(ctx, cell, sigma);
+  PetscCall(get_cell_attribute(ctx, cell, sigma));
 
   calculate_ref_cell_quadrature_points(2, ref_qpoints, weights);
   transform_cell_quadrature_points(cell, ref_qpoints, weights, qpoints, jxw);
@@ -1041,7 +1028,7 @@ PetscErrorCode integrate_over_cell(EMContext *ctx, const TetAccessor &cell, int 
   for (i = 0; i < (int)solutions.size(); ++i) {
     residuals[i] = 0.0;
     for (q = 0; q < (int)qpoints.size(); ++q) {
-      ierr = calculate_function_value(ctx, fv, qpoints[q], *(solutions[i]), e); CHKERRQ(ierr);
+      PetscCall(calculate_function_value(ctx, fv, qpoints[q], *(solutions[i]), e));
       residuals[i] += (II * omega * (sigma * e)).squaredNorm() * jxw[q];
     }
   }
@@ -1062,7 +1049,6 @@ PetscErrorCode integrate_over_face(EMContext *ctx, const TetAccessor &cell, int 
   int i, q, n, non;
   FEValues fv, fv_n;
   TetAccessor cell_n;
-  PetscErrorCode ierr;
   Tensor sigma, sigma_n;
   VectorZ e, e_n, ce, ce_n;
   std::vector<double> weights, jxw, dotj, crossh;
@@ -1075,8 +1061,8 @@ PetscErrorCode integrate_over_face(EMContext *ctx, const TetAccessor &cell, int 
 
   cell_n = TetAccessor(ctx->mesh.get(), n);
 
-  ierr = get_cell_attribute(ctx, cell, sigma);
-  ierr = get_cell_attribute(ctx, cell_n, sigma_n);
+  PetscCall(get_cell_attribute(ctx, cell, sigma));
+  PetscCall(get_cell_attribute(ctx, cell_n, sigma_n));
 
   fv.reinit(cell);
   fv_n.reinit(cell_n);
@@ -1093,12 +1079,12 @@ PetscErrorCode integrate_over_face(EMContext *ctx, const TetAccessor &cell, int 
     dotj[i] = 0.0;
     crossh[i] = 0.0;
     for (q = 0; q < (int)qpoints.size(); ++q) {
-      ierr = calculate_function_value(ctx, fv, qpoints[q], *(solutions[i]), e); CHKERRQ(ierr);
-      ierr = calculate_function_value(ctx, fv_n, qpoints[q], *(solutions[i]), e_n); CHKERRQ(ierr);
+      PetscCall(calculate_function_value(ctx, fv, qpoints[q], *(solutions[i]), e));
+      PetscCall(calculate_function_value(ctx, fv_n, qpoints[q], *(solutions[i]), e_n));
       dotj[i] += std::norm(((sigma * e) - (sigma_n * e_n)).dot(fn)) * jxw[q];
 
-      ierr = calculate_function_curl(ctx, fv, qpoints[q], *(solutions[i]), ce); CHKERRQ(ierr);
-      ierr = calculate_function_curl(ctx, fv_n, qpoints[q], *(solutions[i]), ce_n); CHKERRQ(ierr);
+      PetscCall(calculate_function_curl(ctx, fv, qpoints[q], *(solutions[i]), ce));
+      PetscCall(calculate_function_curl(ctx, fv_n, qpoints[q], *(solutions[i]), ce_n));
       crossh[i] += (ce - ce_n).cross(fn).squaredNorm() * jxw[q];
     }
   }
@@ -1116,7 +1102,6 @@ PetscErrorCode integrate_over_face(EMContext *ctx, const TetAccessor &cell, int 
 PetscErrorCode estimate_error(EMContext *ctx, int fidx, int tidx) {
   int i, t, f;
   TetAccessor cell;
-  PetscErrorCode ierr;
   std::vector<Eigen::VectorXd> errors;
   std::vector<Eigen::MatrixXd> face_errors;
   std::vector<PETScBlockVector *> solutions;
@@ -1158,7 +1143,7 @@ PetscErrorCode estimate_error(EMContext *ctx, int fidx, int tidx) {
       continue;
     }
 
-    ierr = integrate_over_cell(ctx, cell, fidx, solutions, errors); CHKERRQ(ierr);
+    PetscCall(integrate_over_cell(ctx, cell, fidx, solutions, errors));
 
     for (f = 0; f < TRIANGLES_PER_TET; ++f) {
       if (cell.neighbor(f) < 0) {
@@ -1170,7 +1155,7 @@ PetscErrorCode estimate_error(EMContext *ctx, int fidx, int tidx) {
       if (face_errors[0](t, f) >= 0.0) {
         continue;
       }
-      ierr = integrate_over_face(ctx, cell, f, solutions, face_errors); CHKERRQ(ierr);
+      PetscCall(integrate_over_face(ctx, cell, f, solutions, face_errors));
     }
 
     for (i = 0; i < (int)solutions.size(); ++i) {
@@ -1181,7 +1166,7 @@ PetscErrorCode estimate_error(EMContext *ctx, int fidx, int tidx) {
   }
 
   for (i = 0; i < (int)solutions.size(); ++i) {
-    ierr = MPI_Allreduce(MPI_IN_PLACE, &errors[i][0], errors[i].size(), MPI_DOUBLE, MPI_SUM, ctx->group_comm); CHKERRQ(ierr);
+    PetscCall(MPI_Allreduce(MPI_IN_PLACE, &errors[i][0], errors[i].size(), MPI_DOUBLE, MPI_SUM, ctx->group_comm));
   }
 
   if (tidx < 0) {
@@ -1255,7 +1240,6 @@ PetscErrorCode refine_fixed_number(const Eigen::VectorXd &error, std::vector<boo
 }
 
 PetscErrorCode refine_mesh(EMContext *ctx, int tidx) {
-  PetscErrorCode ierr;
   std::vector<bool> refine_flag;
 
   PetscFunctionBegin;
@@ -1267,17 +1251,17 @@ PetscErrorCode refine_mesh(EMContext *ctx, int tidx) {
 
   if (tidx < 0) {
     if (ctx->refine_strategy == FixedFraction) {
-      ierr = refine_fixed_fraction(ctx->mt_error[XY_POLAR], refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
-      ierr = refine_fixed_fraction(ctx->mt_error[YX_POLAR], refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
+      PetscCall(refine_fixed_fraction(ctx->mt_error[XY_POLAR], refine_flag, ctx->refine_fraction));
+      PetscCall(refine_fixed_fraction(ctx->mt_error[YX_POLAR], refine_flag, ctx->refine_fraction));
     } else {
-      ierr = refine_fixed_number(ctx->mt_error[XY_POLAR], refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
-      ierr = refine_fixed_number(ctx->mt_error[YX_POLAR], refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
+      PetscCall(refine_fixed_number(ctx->mt_error[XY_POLAR], refine_flag, ctx->refine_fraction));
+      PetscCall(refine_fixed_number(ctx->mt_error[YX_POLAR], refine_flag, ctx->refine_fraction));
     }
   } else {
     if (ctx->refine_strategy == FixedFraction) {
-      ierr = refine_fixed_fraction(ctx->csem_error, refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
+      PetscCall(refine_fixed_fraction(ctx->csem_error, refine_flag, ctx->refine_fraction));
     } else {
-      ierr = refine_fixed_number(ctx->csem_error, refine_flag, ctx->refine_fraction); CHKERRQ(ierr);
+      PetscCall(refine_fixed_number(ctx->csem_error, refine_flag, ctx->refine_fraction));
     }
   }
 
@@ -1335,130 +1319,127 @@ PetscErrorCode distribute_tasks(EMContext *ctx, std::vector<TupleII> &tasks) {
 
 PetscErrorCode forward_mt(EMContext *ctx, int fidx) {
   int cycle;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
   LogStageHelper freq_lsh(string_format("Freq-%d", (int)fidx));
 
-  ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz:\n", ctx->freqs[fidx]); CHKERRQ(ierr);
-  ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz:\n", ctx->freqs[fidx]));
+  PetscCall(PetscViewerASCIIPushTab(ctx->LS_log));
 
   ctx->mesh->copy(*ctx->coarse_mesh);
 
-  ierr = refine_rx_area(ctx); CHKERRQ(ierr);
-  ierr = refine_uniform(ctx); CHKERRQ(ierr);
+  PetscCall(refine_rx_area(ctx));
+  PetscCall(refine_uniform(ctx));
 
   for (cycle = 0; cycle < ctx->max_adaptive_refinements + 1; ++cycle) {
     LogStageHelper freq_refine_lsh(string_format("Freq-%d-Refine-%d", fidx, cycle));
 
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Cycle %d, cells %d, dofs %d:\n", cycle, ctx->mesh->n_tets(), ctx->mesh->n_edges()); CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Cycle %d, cells %d, dofs %d:\n", cycle, ctx->mesh->n_tets(), ctx->mesh->n_edges()));
+    PetscCall(PetscViewerASCIIPushTab(ctx->LS_log));
 
-    ierr = create_linear_system(ctx, -3); CHKERRQ(ierr);
+    PetscCall(create_linear_system(ctx, -3));
 
-    ierr = assemble_matrix(ctx, fidx); CHKERRQ(ierr);
-    ierr = create_pc(ctx); CHKERRQ(ierr);
+    PetscCall(assemble_matrix(ctx, fidx));
+    PetscCall(create_pc(ctx));
 
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for XY mode:\n"); CHKERRQ(ierr);
-    ierr = assemble_rhs_mt(ctx, fidx, XY_POLAR); CHKERRQ(ierr);
-    ierr = solve_linear_system(ctx, ctx->s, ctx->mt_e[XY_POLAR], ctx->K_max_it, ctx->e_rtol); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Solving for XY mode:\n"));
+    PetscCall(assemble_rhs_mt(ctx, fidx, XY_POLAR));
+    PetscCall(solve_linear_system(ctx, ctx->s, ctx->mt_e[XY_POLAR], ctx->K_max_it, ctx->e_rtol));
 
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for YX mode:\n"); CHKERRQ(ierr);
-    ierr = assemble_rhs_mt(ctx, fidx, YX_POLAR); CHKERRQ(ierr);
-    ierr = solve_linear_system(ctx, ctx->s, ctx->mt_e[YX_POLAR], ctx->K_max_it, ctx->e_rtol); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Solving for YX mode:\n"));
+    PetscCall(assemble_rhs_mt(ctx, fidx, YX_POLAR));
+    PetscCall(solve_linear_system(ctx, ctx->s, ctx->mt_e[YX_POLAR], ctx->K_max_it, ctx->e_rtol));
 
-    ierr = assemble_rhs_dual(ctx); CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"); CHKERRQ(ierr);
-    ierr = solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol); CHKERRQ(ierr);
+    PetscCall(assemble_rhs_dual(ctx));
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"));
+    PetscCall(solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol));
 
-    ierr = destroy_pc(ctx); CHKERRQ(ierr);
+    PetscCall(destroy_pc(ctx));
 
-    ierr = estimate_error(ctx, fidx, -3); CHKERRQ(ierr);
+    PetscCall(estimate_error(ctx, fidx, -3));
     if (ctx->save_mesh) {
-      ierr = save_mesh(ctx, (string_format("%s-%02d-%02d.vtk", ctx->oprefix, fidx, cycle)).c_str(), -3); CHKERRQ(ierr);
+      PetscCall(save_mesh(ctx, (string_format("%s-%02d-%02d.vtk", ctx->oprefix, fidx, cycle)).c_str(), -3));
     }
 
-    ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPopTab(ctx->LS_log));
 
     if (cycle == ctx->max_adaptive_refinements || ctx->mesh->n_edges() >= ctx->max_dofs) {
-      ierr = calculate_response_mt(ctx, fidx); CHKERRQ(ierr);
-      ierr = destroy_linear_system(ctx); CHKERRQ(ierr);
+      PetscCall(calculate_response_mt(ctx, fidx));
+      PetscCall(destroy_linear_system(ctx));
       break;
     } else {
-      ierr = refine_mesh(ctx, -3); CHKERRQ(ierr);
+      PetscCall(refine_mesh(ctx, -3));
     }
 
-    ierr = destroy_linear_system(ctx); CHKERRQ(ierr);
+    PetscCall(destroy_linear_system(ctx));
   }
-  ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PetscViewerASCIIPopTab(ctx->LS_log));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode forward_csem(EMContext *ctx, int fidx, int tidx) {
   int cycle;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
   LogStageHelper freq_lsh(string_format("Freq-%d-TX-%d", fidx, tidx));
 
-  ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz, TX %d:\n", ctx->freqs[fidx], tidx); CHKERRQ(ierr);
-  ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Freq %g Hz, TX %d:\n", ctx->freqs[fidx], tidx));
+  PetscCall(PetscViewerASCIIPushTab(ctx->LS_log));
 
   ctx->mesh->copy(*ctx->coarse_mesh);
 
-  ierr = refine_tx_area(ctx, tidx); CHKERRQ(ierr);
-  ierr = refine_rx_area(ctx); CHKERRQ(ierr);
-  ierr = refine_uniform(ctx); CHKERRQ(ierr);
+  PetscCall(refine_tx_area(ctx, tidx));
+  PetscCall(refine_rx_area(ctx));
+  PetscCall(refine_uniform(ctx));
 
   for (cycle = 0; cycle < ctx->max_adaptive_refinements + 1; ++cycle) {
     LogStageHelper freq_refine_lsh(string_format("Freq-%d-TX-%d-Refine-%d", fidx, tidx, cycle));
 
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Cycle %d, cells %d, dofs %d:\n", cycle, ctx->mesh->n_tets(), ctx->mesh->n_edges()); CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Cycle %d, cells %d, dofs %d:\n", cycle, ctx->mesh->n_tets(), ctx->mesh->n_edges()));
+    PetscCall(PetscViewerASCIIPushTab(ctx->LS_log));
 
-    ierr = create_linear_system(ctx, tidx); CHKERRQ(ierr);
+    PetscCall(create_linear_system(ctx, tidx));
 
-    ierr = assemble_matrix(ctx, fidx); CHKERRQ(ierr);
-    ierr = create_pc(ctx); CHKERRQ(ierr);
+    PetscCall(assemble_matrix(ctx, fidx));
+    PetscCall(create_pc(ctx));
 
-    ierr = assemble_rhs_csem(ctx, fidx, tidx); CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for E mode:\n"); CHKERRQ(ierr);
-    ierr = solve_linear_system(ctx, ctx->s, ctx->csem_e, ctx->K_max_it, ctx->e_rtol); CHKERRQ(ierr);
+    PetscCall(assemble_rhs_csem(ctx, fidx, tidx));
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Solving for E mode:\n"));
+    PetscCall(solve_linear_system(ctx, ctx->s, ctx->csem_e, ctx->K_max_it, ctx->e_rtol));
 
-    ierr = assemble_rhs_dual(ctx); CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"); CHKERRQ(ierr);
-    ierr = solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol); CHKERRQ(ierr);
+    PetscCall(assemble_rhs_dual(ctx));
+    PetscCall(PetscViewerASCIIPrintf(ctx->LS_log, "Solving for dual mode:\n"));
+    PetscCall(solve_linear_system(ctx, ctx->s, ctx->dual_e, ctx->K_max_it, ctx->dual_rtol));
 
-    ierr = destroy_pc(ctx); CHKERRQ(ierr);
+    PetscCall(destroy_pc(ctx));
 
-    ierr = estimate_error(ctx, fidx, tidx); CHKERRQ(ierr);
+    PetscCall(estimate_error(ctx, fidx, tidx));
     if (ctx->save_mesh) {
-      ierr = save_mesh(ctx, (string_format("%s-%02d-%03d-%02d.vtk", ctx->oprefix, fidx, tidx, cycle)).c_str(), tidx); CHKERRQ(ierr);
+      PetscCall(save_mesh(ctx, (string_format("%s-%02d-%03d-%02d.vtk", ctx->oprefix, fidx, tidx, cycle)).c_str(), tidx));
     }
 
-    ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
+    PetscCall(PetscViewerASCIIPopTab(ctx->LS_log));
 
     if (cycle == ctx->max_adaptive_refinements || ctx->mesh->n_edges() >= ctx->max_dofs) {
-      ierr = calculate_response_csem(ctx, fidx, tidx); CHKERRQ(ierr);
-      ierr = destroy_linear_system(ctx); CHKERRQ(ierr);
+      PetscCall(calculate_response_csem(ctx, fidx, tidx));
+      PetscCall(destroy_linear_system(ctx));
       break;
     } else {
-      ierr = refine_mesh(ctx, tidx); CHKERRQ(ierr);
+      PetscCall(refine_mesh(ctx, tidx));
     }
 
-    ierr = destroy_linear_system(ctx); CHKERRQ(ierr);
+    PetscCall(destroy_linear_system(ctx));
   }
-  ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PetscViewerASCIIPopTab(ctx->LS_log));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode em_forward(EMContext *ctx) {
   int i;
-  PetscErrorCode ierr;
   std::vector<TupleII> tasks;
 
   PetscFunctionBegin;
@@ -1466,25 +1447,25 @@ PetscErrorCode em_forward(EMContext *ctx) {
   LogStageHelper lsh("Forward");
 
   if (ctx->mesh_format == MDL) {
-    ierr = read_mdl(ctx); CHKERRQ(ierr);
+    PetscCall(read_mdl(ctx));
   } else {
-    ierr = read_mesh(ctx); CHKERRQ(ierr);
+    PetscCall(read_mesh(ctx));
   }
-  ierr = read_emd(ctx); CHKERRQ(ierr);
+  PetscCall(read_emd(ctx));
 
-  ierr = update_background_model(ctx); CHKERRQ(ierr);
+  PetscCall(update_background_model(ctx));
 
-  ierr = distribute_tasks(ctx, tasks); CHKERRQ(ierr);
+  PetscCall(distribute_tasks(ctx, tasks));
 
   for (i = 0; i < (int)tasks.size(); ++i) {
     if (std::get<1>(tasks[i]) < 0) {
-      ierr = forward_mt(ctx, std::get<0>(tasks[i])); CHKERRQ(ierr);
+      PetscCall(forward_mt(ctx, std::get<0>(tasks[i])));
     } else {
-      ierr = forward_csem(ctx, std::get<0>(tasks[i]), std::get<1>(tasks[i])); CHKERRQ(ierr);
+      PetscCall(forward_csem(ctx, std::get<0>(tasks[i]), std::get<1>(tasks[i])));
     }
   }
 
-  ierr = save_rsp(ctx, (std::string(ctx->oprefix) + ".rsp").c_str()); CHKERRQ(ierr);
+  PetscCall(save_rsp(ctx, (std::string(ctx->oprefix) + ".rsp").c_str()));
 
   PetscFunctionReturn(0);
 }

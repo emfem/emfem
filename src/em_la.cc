@@ -7,15 +7,14 @@
 PetscErrorCode access_vec(Vec v, std::vector<PetscInt> &ghosts, int idx, double *value) {
   Vec lv;
   PetscReal *ptr;
-  PetscErrorCode ierr;
   PetscInt begin, end, gidx;
 
   PetscFunctionBegin;
 
-  ierr = VecGetOwnershipRange(v, &begin, &end);
+  PetscCall(VecGetOwnershipRange(v, &begin, &end));
 
-  ierr = VecGhostGetLocalForm(v, &lv); CHKERRQ(ierr);
-  ierr = VecGetArray(lv, &ptr); CHKERRQ(ierr);
+  PetscCall(VecGhostGetLocalForm(v, &lv));
+  PetscCall(VecGetArray(lv, &ptr));
 
   if (idx >= begin && idx < end) {
     *value = ptr[idx - begin];
@@ -27,14 +26,13 @@ PetscErrorCode access_vec(Vec v, std::vector<PetscInt> &ghosts, int idx, double 
     *value = ptr[end - begin + gidx];
   }
 
-  ierr = VecRestoreArray(lv, &ptr); CHKERRQ(ierr);
-  ierr = VecGhostRestoreLocalForm(v, &lv); CHKERRQ(ierr);
+  PetscCall(VecRestoreArray(lv, &ptr));
+  PetscCall(VecGhostRestoreLocalForm(v, &lv));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode solve_linear_system(EMContext *ctx, const PETScBlockVector &s, PETScBlockVector &e, PetscInt max_it, PetscReal rtol) {
-  PetscErrorCode ierr;
   Vec xx[2], bb[2], x, b;
 
   PetscFunctionBegin;
@@ -43,23 +41,23 @@ PetscErrorCode solve_linear_system(EMContext *ctx, const PETScBlockVector &s, PE
 
   xx[0] = e.re;
   xx[1] = e.im;
-  ierr = VecCreateNest(ctx->group_comm, 2, NULL, xx, &x); CHKERRQ(ierr);
+  PetscCall(VecCreateNest(ctx->group_comm, 2, NULL, xx, &x));
   bb[0] = s.re;
   bb[1] = s.im;
-  ierr = VecCreateNest(ctx->group_comm, 2, NULL, bb, &b); CHKERRQ(ierr);
+  PetscCall(VecCreateNest(ctx->group_comm, 2, NULL, bb, &b));
 
-  ierr = VecZeroEntries(x); CHKERRQ(ierr);
+  PetscCall(VecZeroEntries(x));
 
-  ierr = KSPSetTolerances(ctx->A_ksp, rtol, PETSC_DEFAULT, PETSC_DEFAULT, max_it); CHKERRQ(ierr);
-  ierr = KSPSolve(ctx->A_ksp, b, x); CHKERRQ(ierr);
+  PetscCall(KSPSetTolerances(ctx->A_ksp, rtol, PETSC_DEFAULT, PETSC_DEFAULT, max_it));
+  PetscCall(KSPSolve(ctx->A_ksp, b, x));
 
-  ierr = VecDestroy(&x); CHKERRQ(ierr);
-  ierr = VecDestroy(&b); CHKERRQ(ierr);
+  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&b));
 
-  ierr = VecGhostUpdateBegin(e.re, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
-  ierr = VecGhostUpdateEnd(e.re, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
-  ierr = VecGhostUpdateBegin(e.im, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
-  ierr = VecGhostUpdateEnd(e.im, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
+  PetscCall(VecGhostUpdateBegin(e.re, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGhostUpdateEnd(e.re, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGhostUpdateBegin(e.im, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGhostUpdateEnd(e.im, INSERT_VALUES, SCATTER_FORWARD));
 
   PetscFunctionReturn(0);
 }
@@ -67,24 +65,23 @@ PetscErrorCode solve_linear_system(EMContext *ctx, const PETScBlockVector &s, PE
 PetscErrorCode matshell_mult_a(Mat A, Vec x, Vec y) {
   EMContext *ctx;
   Vec xr, xi, yr, yi;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
-  ierr = VecNestGetSubVec(x, 0, &xr); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(x, 1, &xi); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(y, 0, &yr); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(y, 1, &yi); CHKERRQ(ierr);
+  PetscCall(VecNestGetSubVec(x, 0, &xr));
+  PetscCall(VecNestGetSubVec(x, 1, &xi));
+  PetscCall(VecNestGetSubVec(y, 0, &yr));
+  PetscCall(VecNestGetSubVec(y, 1, &yi));
 
-  ierr = MatShellGetContext(A, &ctx); CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
-  ierr = MatMult(ctx->C, xr, yr); CHKERRQ(ierr);
-  ierr = MatMult(ctx->M, xi, ctx->w); CHKERRQ(ierr);
-  ierr = VecAXPY(yr, -1.0, ctx->w); CHKERRQ(ierr);
-  ierr = MatMult(ctx->M, xr, yi); CHKERRQ(ierr);
-  ierr = VecScale(yi, -1.0); CHKERRQ(ierr);
-  ierr = MatMult(ctx->C, xi, ctx->w); CHKERRQ(ierr);
-  ierr = VecAXPY(yi, -1.0, ctx->w); CHKERRQ(ierr);
+  PetscCall(MatMult(ctx->C, xr, yr));
+  PetscCall(MatMult(ctx->M, xi, ctx->w));
+  PetscCall(VecAXPY(yr, -1.0, ctx->w));
+  PetscCall(MatMult(ctx->M, xr, yi));
+  PetscCall(VecScale(yi, -1.0));
+  PetscCall(MatMult(ctx->C, xi, ctx->w));
+  PetscCall(VecAXPY(yi, -1.0, ctx->w));
 
   PetscFunctionReturn(0);
 }
@@ -92,24 +89,23 @@ PetscErrorCode matshell_mult_a(Mat A, Vec x, Vec y) {
 PetscErrorCode matshell_createvecs_a(Mat A, Vec *right, Vec *left) {
   Vec xx[2], x;
   EMContext *ctx;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
-  ierr = MatShellGetContext(A, &ctx); CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
   xx[0] = ctx->w;
   xx[1] = ctx->w;
-  ierr = VecCreateNest(ctx->group_comm, 2, NULL, xx, &x); CHKERRQ(ierr);
+  PetscCall(VecCreateNest(ctx->group_comm, 2, NULL, xx, &x));
 
   if (right) {
-    ierr = VecDuplicate(x, right); CHKERRQ(ierr);
+    PetscCall(VecDuplicate(x, right));
   }
   if (left) {
-    ierr = VecDuplicate(x, left); CHKERRQ(ierr);
+    PetscCall(VecDuplicate(x, left));
   }
 
-  ierr = VecDestroy(&x); CHKERRQ(ierr);
+  PetscCall(VecDestroy(&x));
 
   PetscFunctionReturn(0);
 }
@@ -117,97 +113,94 @@ PetscErrorCode matshell_createvecs_a(Mat A, Vec *right, Vec *left) {
 PetscErrorCode create_pc(EMContext *ctx) {
   PetscInt nrow;
   PC A_pc, B_pc;
-  PetscErrorCode ierr;
   PetscViewerAndFormat *vf;
 
   PetscFunctionBegin;
 
   LogEventHelper leh(ctx->CreatePC);
 
-  ierr = MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->B); CHKERRQ(ierr);
-  ierr = MatCopy(ctx->C, ctx->B, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
-  ierr = MatAXPY(ctx->B, 1.0, ctx->M, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)(ctx->B), "B"); CHKERRQ(ierr);
-  ierr = MatSetOptionsPrefix(ctx->B, "B_"); CHKERRQ(ierr);
-  ierr = MatSetOption(ctx->B, MAT_SPD, PETSC_TRUE); CHKERRQ(ierr);
-  ierr = MatSetFromOptions(ctx->B); CHKERRQ(ierr);
+  PetscCall(MatDuplicate(ctx->C, MAT_SHARE_NONZERO_PATTERN, &ctx->B));
+  PetscCall(MatCopy(ctx->C, ctx->B, SAME_NONZERO_PATTERN));
+  PetscCall(MatAXPY(ctx->B, 1.0, ctx->M, SAME_NONZERO_PATTERN));
+  PetscCall(PetscObjectSetName((PetscObject)(ctx->B), "B"));
+  PetscCall(MatSetOptionsPrefix(ctx->B, "B_"));
+  PetscCall(MatSetOption(ctx->B, MAT_SPD, PETSC_TRUE));
+  PetscCall(MatSetFromOptions(ctx->B));
 
-  ierr = KSPCreate(ctx->group_comm, &ctx->B_ksp); CHKERRQ(ierr);
-  ierr = KSPSetOptionsPrefix(ctx->B_ksp, "B_"); CHKERRQ(ierr);
-  ierr = KSPSetOperators(ctx->B_ksp, ctx->B, ctx->B); CHKERRQ(ierr);
+  PetscCall(KSPCreate(ctx->group_comm, &ctx->B_ksp));
+  PetscCall(KSPSetOptionsPrefix(ctx->B_ksp, "B_"));
+  PetscCall(KSPSetOperators(ctx->B_ksp, ctx->B, ctx->B));
 
   if (ctx->use_ams) {
-    ierr = KSPSetNormType(ctx->B_ksp, KSP_NORM_UNPRECONDITIONED); CHKERRQ(ierr);
+    PetscCall(KSPSetNormType(ctx->B_ksp, KSP_NORM_UNPRECONDITIONED));
   }
 
-  ierr = KSPGetPC(ctx->B_ksp, &B_pc); CHKERRQ(ierr);
+  PetscCall(KSPGetPC(ctx->B_ksp, &B_pc));
   if (ctx->use_ams) {
-    ierr = setup_ams(ctx); CHKERRQ(ierr);
-    ierr = KSPSetType(ctx->B_ksp, KSPFCG); CHKERRQ(ierr);
-    ierr = KSPSetTolerances(ctx->B_ksp, 1E-2, PETSC_DEFAULT, PETSC_DEFAULT, 100); CHKERRQ(ierr);
-    ierr = PCSetType(B_pc, PCHYPRE); CHKERRQ(ierr);
-    ierr = PCHYPRESetType(B_pc, "ams"); CHKERRQ(ierr);
-    ierr = PCHYPRESetDiscreteGradient(B_pc, ctx->G); CHKERRQ(ierr);
-    ierr = PCSetCoordinates(B_pc, 3, (PetscInt)ctx->v_coords.size() / 3, &ctx->v_coords[0]); CHKERRQ(ierr);
+    PetscCall(setup_ams(ctx));
+    PetscCall(KSPSetType(ctx->B_ksp, KSPFCG));
+    PetscCall(KSPSetTolerances(ctx->B_ksp, 1E-2, PETSC_DEFAULT, PETSC_DEFAULT, 100));
+    PetscCall(PCSetType(B_pc, PCHYPRE));
+    PetscCall(PCHYPRESetType(B_pc, "ams"));
+    PetscCall(PCHYPRESetDiscreteGradient(B_pc, ctx->G));
+    PetscCall(PCSetCoordinates(B_pc, 3, (PetscInt)ctx->v_coords.size() / 3, &ctx->v_coords[0]));
   } else {
-    ierr = KSPSetType(ctx->B_ksp, KSPPREONLY); CHKERRQ(ierr);
-    ierr = PCSetType(B_pc, PCCHOLESKY); CHKERRQ(ierr);
+    PetscCall(KSPSetType(ctx->B_ksp, KSPPREONLY));
+    PetscCall(PCSetType(B_pc, PCCHOLESKY));
     if (ctx->direct_solver_type == MUMPS) {
-      ierr = PCFactorSetMatSolverType(B_pc, MATSOLVERMUMPS); CHKERRQ(ierr);
+      PetscCall(PCFactorSetMatSolverType(B_pc, MATSOLVERMUMPS));
     } else if (ctx->direct_solver_type == SUPERLUDIST) {
-      ierr = PCFactorSetMatSolverType(B_pc, MATSOLVERSUPERLU_DIST); CHKERRQ(ierr);
+      PetscCall(PCFactorSetMatSolverType(B_pc, MATSOLVERSUPERLU_DIST));
     }
   }
-  ierr = PCSetFromOptions(B_pc); CHKERRQ(ierr);
-  ierr = PCSetUp(B_pc); CHKERRQ(ierr);
+  PetscCall(PCSetFromOptions(B_pc));
+  PetscCall(PCSetUp(B_pc));
 
   if (ctx->use_ams) {
-    ierr = PetscViewerAndFormatCreate(ctx->LS_log, PETSC_VIEWER_DEFAULT, &vf); CHKERRQ(ierr);
-    ierr = KSPMonitorSet(ctx->B_ksp, (PetscErrorCode(*)(KSP, PetscInt, PetscReal, void *))KSPMonitorTrueResidual, vf, (PetscErrorCode(*)(void **))PetscViewerAndFormatDestroy); CHKERRQ(ierr);
+    PetscCall(PetscViewerAndFormatCreate(ctx->LS_log, PETSC_VIEWER_DEFAULT, &vf));
+    PetscCall(KSPMonitorSet(ctx->B_ksp, (PetscErrorCode(*)(KSP, PetscInt, PetscReal, void *))KSPMonitorTrueResidual, vf, (PetscErrorCode(*)(void **))PetscViewerAndFormatDestroy));
   }
-  ierr = KSPSetFromOptions(ctx->B_ksp); CHKERRQ(ierr);
-  ierr = KSPSetUp(ctx->B_ksp); CHKERRQ(ierr);
+  PetscCall(KSPSetFromOptions(ctx->B_ksp));
+  PetscCall(KSPSetUp(ctx->B_ksp));
 
   nrow = ctx->local_edges.second - ctx->local_edges.first;
-  ierr = MatCreateShell(ctx->group_comm, nrow * 2, nrow * 2, PETSC_DECIDE, PETSC_DECIDE, ctx, &ctx->A);
-  ierr = MatShellSetOperation(ctx->A, MATOP_MULT, (void(*)(void))matshell_mult_a); CHKERRQ(ierr);
-  ierr = MatShellSetOperation(ctx->A, MATOP_MULT_TRANSPOSE, (void(*)(void))matshell_mult_a); CHKERRQ(ierr);
-  ierr = MatShellSetOperation(ctx->A, MATOP_CREATE_VECS, (void(*)(void))matshell_createvecs_a); CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)(ctx->A), "A"); CHKERRQ(ierr);
-  ierr = MatSetOptionsPrefix(ctx->A, "A_"); CHKERRQ(ierr);
-  ierr = MatSetFromOptions(ctx->A); CHKERRQ(ierr);
+  PetscCall(MatCreateShell(ctx->group_comm, nrow * 2, nrow * 2, PETSC_DECIDE, PETSC_DECIDE, ctx, &ctx->A));
+  PetscCall(MatShellSetOperation(ctx->A, MATOP_MULT, (void(*)(void))matshell_mult_a));
+  PetscCall(MatShellSetOperation(ctx->A, MATOP_MULT_TRANSPOSE, (void(*)(void))matshell_mult_a));
+  PetscCall(MatShellSetOperation(ctx->A, MATOP_CREATE_VECS, (void(*)(void))matshell_createvecs_a));
+  PetscCall(PetscObjectSetName((PetscObject)(ctx->A), "A"));
+  PetscCall(MatSetOptionsPrefix(ctx->A, "A_"));
+  PetscCall(MatSetFromOptions(ctx->A));
 
-  ierr = KSPCreate(ctx->group_comm, &ctx->A_ksp); CHKERRQ(ierr);
-  ierr = KSPSetOptionsPrefix(ctx->A_ksp, "A_"); CHKERRQ(ierr);
-  ierr = KSPSetOperators(ctx->A_ksp, ctx->A, ctx->A); CHKERRQ(ierr);
-  ierr = KSPSetType(ctx->A_ksp, KSPFGMRES); CHKERRQ(ierr);
-  ierr = KSPGetPC(ctx->A_ksp, &A_pc); CHKERRQ(ierr);
-  ierr = PCSetType(A_pc, PCSHELL); CHKERRQ(ierr);
-  ierr = PCShellSetContext(A_pc, ctx); CHKERRQ(ierr);
-  ierr = PCShellSetApply(A_pc, pc_apply_b); CHKERRQ(ierr);
+  PetscCall(KSPCreate(ctx->group_comm, &ctx->A_ksp));
+  PetscCall(KSPSetOptionsPrefix(ctx->A_ksp, "A_"));
+  PetscCall(KSPSetOperators(ctx->A_ksp, ctx->A, ctx->A));
+  PetscCall(KSPSetType(ctx->A_ksp, KSPFGMRES));
+  PetscCall(KSPGetPC(ctx->A_ksp, &A_pc));
+  PetscCall(PCSetType(A_pc, PCSHELL));
+  PetscCall(PCShellSetContext(A_pc, ctx));
+  PetscCall(PCShellSetApply(A_pc, pc_apply_b));
 
-  ierr = PetscViewerAndFormatCreate(ctx->LS_log, PETSC_VIEWER_DEFAULT, &vf); CHKERRQ(ierr);
-  ierr = KSPMonitorSet(ctx->A_ksp, (PetscErrorCode(*)(KSP, PetscInt, PetscReal, void *))KSPMonitorTrueResidual, vf, (PetscErrorCode(*)(void **))PetscViewerAndFormatDestroy); CHKERRQ(ierr);
+  PetscCall(PetscViewerAndFormatCreate(ctx->LS_log, PETSC_VIEWER_DEFAULT, &vf));
+  PetscCall(KSPMonitorSet(ctx->A_ksp, (PetscErrorCode(*)(KSP, PetscInt, PetscReal, void *))KSPMonitorTrueResidual, vf, (PetscErrorCode(*)(void **))PetscViewerAndFormatDestroy));
 
-  ierr = KSPSetFromOptions(ctx->A_ksp); CHKERRQ(ierr);
-  ierr = KSPSetUp(ctx->A_ksp); CHKERRQ(ierr);
+  PetscCall(KSPSetFromOptions(ctx->A_ksp));
+  PetscCall(KSPSetUp(ctx->A_ksp));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode destroy_pc(EMContext *ctx) {
-  PetscErrorCode ierr;
-
   PetscFunctionBegin;
 
   if (ctx->use_ams) {
-    ierr = destroy_ams(ctx); CHKERRQ(ierr);
+    PetscCall(destroy_ams(ctx));
   }
 
-  ierr = MatDestroy(&ctx->A); CHKERRQ(ierr);
-  ierr = MatDestroy(&ctx->B); CHKERRQ(ierr);
-  ierr = KSPDestroy(&ctx->A_ksp); CHKERRQ(ierr);
-  ierr = KSPDestroy(&ctx->B_ksp); CHKERRQ(ierr);
+  PetscCall(MatDestroy(&ctx->A));
+  PetscCall(MatDestroy(&ctx->B));
+  PetscCall(KSPDestroy(&ctx->A_ksp));
+  PetscCall(KSPDestroy(&ctx->B_ksp));
 
   PetscFunctionReturn(0);
 }
@@ -215,29 +208,27 @@ PetscErrorCode destroy_pc(EMContext *ctx) {
 PetscErrorCode pc_apply_b(PC pc, Vec b, Vec x) {
   EMContext *ctx;
   Vec br, bi, xr, xi;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
-  ierr = PCShellGetContext(pc, (void **)&ctx); CHKERRQ(ierr);
-  ierr = PetscViewerASCIIPushTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PCShellGetContext(pc, (void **)&ctx));
+  PetscCall(PetscViewerASCIIPushTab(ctx->LS_log));
 
-  ierr = VecNestGetSubVec(b, 0, &br); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(b, 1, &bi); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(x, 0, &xr); CHKERRQ(ierr);
-  ierr = VecNestGetSubVec(x, 1, &xi); CHKERRQ(ierr);
+  PetscCall(VecNestGetSubVec(b, 0, &br));
+  PetscCall(VecNestGetSubVec(b, 1, &bi));
+  PetscCall(VecNestGetSubVec(x, 0, &xr));
+  PetscCall(VecNestGetSubVec(x, 1, &xi));
 
-  ierr = KSPSolve(ctx->B_ksp, br, xr); CHKERRQ(ierr);
-  ierr = KSPSolve(ctx->B_ksp, bi, xi); CHKERRQ(ierr);
+  PetscCall(KSPSolve(ctx->B_ksp, br, xr));
+  PetscCall(KSPSolve(ctx->B_ksp, bi, xi));
 
-  ierr = PetscViewerASCIIPopTab(ctx->LS_log); CHKERRQ(ierr);
+  PetscCall(PetscViewerASCIIPopTab(ctx->LS_log));
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode setup_ams(EMContext *ctx) {
   TetAccessor tet;
-  PetscErrorCode ierr;
   std::vector<PetscReal> vals;
   std::vector<PetscInt> row_ptr, col_idx;
   PetscInt t, e, eidx, v, vidx, n_local_edges, n_edges, n_local_vertices, n_vertices, begin, end;
@@ -283,8 +274,8 @@ PetscErrorCode setup_ams(EMContext *ctx) {
   end = ctx->local_vertices.second;
   n_local_vertices = end - begin;
 
-  ierr = MatCreateMPIAIJWithArrays(ctx->group_comm, n_local_edges, n_local_vertices, n_edges, n_vertices, &row_ptr[0], &col_idx[0], &vals[0], &ctx->G); CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)(ctx->G), "G_"); CHKERRQ(ierr);
+  PetscCall(MatCreateMPIAIJWithArrays(ctx->group_comm, n_local_edges, n_local_vertices, n_edges, n_vertices, &row_ptr[0], &col_idx[0], &vals[0], &ctx->G));
+  PetscCall(PetscObjectSetName((PetscObject)(ctx->G), "G_"));
 
   ctx->v_coords.resize(n_local_vertices * 3);
 
@@ -304,11 +295,9 @@ PetscErrorCode setup_ams(EMContext *ctx) {
 }
 
 PetscErrorCode destroy_ams(EMContext *ctx) {
-  PetscErrorCode ierr;
-
   PetscFunctionBegin;
 
-  ierr = MatDestroy(&ctx->G); CHKERRQ(ierr);
+  PetscCall(MatDestroy(&ctx->G));
 
   PetscFunctionReturn(0);
 }

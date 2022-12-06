@@ -251,7 +251,7 @@ void Mesh::save_vtk(const char *fn, const std::map<std::string, Eigen::VectorXd>
 
 void Mesh::partition() {
   std::vector<idx_t> part, xadj, adjncy;
-  idx_t i, j, nnz, nvtxs, ncon, np, options[METIS_NOPTIONS], dummy, ierr;
+  idx_t i, j, nnz, nvtxs, ncon, np, options[METIS_NOPTIONS], dummy;
 
   nnz = 0;
   for (i = 0; i < n_tets(); ++i) {
@@ -283,18 +283,14 @@ void Mesh::partition() {
   METIS_SetDefaultOptions(options);
 
   if (np == 1) {
-    ierr = METIS_OK;
     std::fill(part.begin(), part.end(), 0);
   } else if (np > 1 && np <= 8) {
-    ierr = METIS_PartGraphRecursive(&nvtxs, &ncon, &xadj[0], &adjncy[0], NULL, NULL, NULL, &np,
-                                    NULL, NULL, options, &dummy, &part[0]);
+    METIS_PartGraphRecursive(&nvtxs, &ncon, &xadj[0], &adjncy[0], NULL, NULL, NULL, &np, NULL, NULL,
+                             options, &dummy, &part[0]);
   } else {
-    ierr = METIS_PartGraphKway(&nvtxs, &ncon, &xadj[0], &adjncy[0], NULL, NULL, NULL, &np, NULL,
-                               NULL, options, &dummy, &part[0]);
+    METIS_PartGraphKway(&nvtxs, &ncon, &xadj[0], &adjncy[0], NULL, NULL, NULL, &np, NULL, NULL,
+                        options, &dummy, &part[0]);
   }
-
-  (void)ierr;
-  assert(ierr == METIS_OK);
 
   subdomain_.resize(n_tets());
   std::copy(part.begin(), part.end(), subdomain_.begin());

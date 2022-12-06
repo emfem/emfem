@@ -317,13 +317,12 @@ PetscErrorCode save_rsp(EMContext *ctx, const char *fn) {
   int i, j;
   FILE *fp;
   Complex obs, rsp;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
-  ierr = MPI_Allreduce(MPI_IN_PLACE, &ctx->rsp[0], ctx->rsp.size() * 2, MPI_DOUBLE, MPI_SUM, ctx->world_comm); CHKERRQ(ierr);
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, &ctx->rsp[0], ctx->rsp.size() * 2, MPI_DOUBLE, MPI_SUM, ctx->world_comm));
 
-  ierr = PetscFOpen(ctx->world_comm, fn, "w", &fp); CHKERRQ(ierr);
+  PetscCall(PetscFOpen(ctx->world_comm, fn, "w", &fp));
 
   PetscFPrintf(ctx->world_comm, fp, "# frequencies\n");
   PetscFPrintf(ctx->world_comm, fp, "%d\n", (int)ctx->freqs.size());
@@ -394,7 +393,7 @@ PetscErrorCode save_rsp(EMContext *ctx, const char *fn) {
     }
   }
 
-  ierr = PetscFClose(ctx->world_comm, fp); CHKERRQ(ierr);
+  PetscCall(PetscFClose(ctx->world_comm, fp));
 
   PetscFunctionReturn(0);
 }

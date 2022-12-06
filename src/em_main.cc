@@ -3,21 +3,20 @@
 
 int main(int argc, char **argv) {
   EMContext ctx;
-  PetscErrorCode ierr;
 
   PetscFunctionBegin;
 
-  ierr = PetscInitialize(&argc, &argv, NULL, NULL); CHKERRQ(ierr);
+  PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
 
-  ierr = process_options(&ctx); CHKERRQ(ierr);
+  PetscCall(process_options(&ctx));
 
-  ierr = create_context(&ctx); CHKERRQ(ierr);
+  PetscCall(create_context(&ctx));
 
-  ierr = em_forward(&ctx); CHKERRQ(ierr);
+  PetscCall(em_forward(&ctx));
 
-  ierr = destroy_context(&ctx); CHKERRQ(ierr);
+  PetscCall(destroy_context(&ctx));
 
-  ierr = PetscFinalize(); CHKERRQ(ierr);
+  PetscCall(PetscFinalize());
 
   PetscFunctionReturn(0);
 }
