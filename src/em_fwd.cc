@@ -64,7 +64,7 @@ PetscErrorCode get_cell_attribute(EMContext *ctx, const TetAccessor &cell, Tenso
             z_rot.transpose();
     break;
   default:
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
+    SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
     break;
   }
 
@@ -644,7 +644,7 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
 
     t = ctx->mesh->find_cell_around_point(center);
     if (t < 0) {
-      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d-%d is not found in mesh.", tidx, j).c_str());
+      SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Transmitter %d-%d is not found in mesh.", tidx, j).c_str());
     }
     cell = TetAccessor(ctx->mesh.get(), t);
 
@@ -688,7 +688,7 @@ PetscErrorCode assemble_rhs_dual(EMContext *ctx) {
   for (i = 0; i < (int)ctx->rx.size(); ++i) {
     t = ctx->mesh->find_cell_around_point(ctx->rx[i]);
     if (t < 0) {
-      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Receiver %d is not found in mesh.", i).c_str());
+      SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Receiver %d is not found in mesh.", i).c_str());
     }
     cell = TetAccessor(ctx->mesh.get(), t);
 
@@ -793,7 +793,7 @@ PetscErrorCode calculate_response_mt(EMContext *ctx, int fidx) {
             (h_yx[2] * h_xy[0] - h_xy[2] * h_yx[0]) / (h_xy[0] * h_yx[1] - h_yx[0] * h_xy[1]);
         break;
       default:
-        SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Data type %d not implemented.", ctx->otype[o]).c_str());
+        SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Data type %d not implemented.", ctx->otype[o]).c_str());
       }
     }
   }
@@ -862,7 +862,7 @@ PetscErrorCode calculate_response_csem(EMContext *ctx, int fidx, int tidx) {
         ctx->rsp[o] = std::log(h[2]);
         break;
       default:
-        SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Data type %d for tx %d is not implemented.", ctx->otype[o], ctx->tidx[o]).c_str());
+        SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Data type %d for tx %d is not implemented.", ctx->otype[o], ctx->tidx[o]).c_str());
       }
     }
   }
@@ -905,7 +905,7 @@ PetscErrorCode refine_tx_area(EMContext *ctx, int tidx) {
     for (i = 0; i < (int)dipoles.size(); ++i) {
       t = ctx->mesh->find_cell_around_point(std::get<0>(dipoles[i]));
       if (t < 0) {
-        SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Transmitter %d-%d is not found in mesh.", tidx, i).c_str());
+        SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Transmitter %d-%d is not found in mesh.", tidx, i).c_str());
       }
       if (TetAccessor(ctx->mesh.get(), t).volume() > std::pow(ctx->max_tx_edge_length, 3)) {
         flg = true;
@@ -942,7 +942,7 @@ PetscErrorCode refine_rx_area(EMContext *ctx) {
     for (i = 0; i < (int)ctx->rx.size(); ++i) {
       t = ctx->mesh->find_cell_around_point(ctx->rx[i]);
       if (t < 0) {
-        SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Receiver %d is not found in mesh.", i).c_str());
+        SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Receiver %d is not found in mesh.", i).c_str());
       }
       if (TetAccessor(ctx->mesh.get(), t).volume() > std::pow(ctx->max_rx_edge_length, 3)) {
         flg = true;

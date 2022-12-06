@@ -21,7 +21,7 @@ PetscErrorCode access_vec(Vec v, std::vector<PetscInt> &ghosts, int idx, double 
   } else {
     gidx = std::lower_bound(ghosts.begin(), ghosts.end(), idx) - ghosts.begin();
     if (gidx >= (int)ghosts.size()) {
-      SETERRQ(PetscObjectComm((PetscObject)v), EM_ERR_USER, string_format("Index %d is not stored in this Vec.", idx).c_str());
+      SETERRQ(PetscObjectComm((PetscObject)v), EM_ERR_USER, "%s", string_format("Index %d is not stored in this Vec.", idx).c_str());
     }
     *value = ptr[end - begin + gidx];
   }

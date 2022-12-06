@@ -46,7 +46,7 @@ static PetscErrorCode read_rho(EMContext *ctx, std::stringstream &ss) {
       ctx->rho_name[5] = "eta_z";
       break;
     default:
-      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
+      SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
       break;
   }
 
@@ -76,7 +76,7 @@ static PetscErrorCode read_rho(EMContext *ctx, std::stringstream &ss) {
       }
       break;
     default:
-      SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
+      SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unsupported anisotropy form %d.", ctx->aniso_form).c_str());
       break;
     }
     ss >> ctx->ub[i] >> ctx->ub[i];
@@ -99,7 +99,7 @@ PetscErrorCode read_mdl(EMContext *ctx) {
 
   std::ifstream ifs(ctx->iprefix + std::string(".mdl"));
   if (!ifs.good()) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.mdl.", ctx->iprefix).c_str());
+    SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unable to open file %s.mdl.", ctx->iprefix).c_str());
   }
 
   while (std::getline(ifs, l)) {
@@ -164,7 +164,7 @@ PetscErrorCode read_mesh(EMContext *ctx) {
 
   std::ifstream ifs_mesh(ctx->iprefix + std::string(".mesh"));
   if (!ifs_mesh.good()) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.mesh.", ctx->iprefix).c_str());
+    SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unable to open file %s.mesh.", ctx->iprefix).c_str());
   }
 
   while (std::getline(ifs_mesh, l)) {
@@ -209,7 +209,7 @@ PetscErrorCode read_emd(EMContext *ctx) {
 
   std::ifstream ifs(ctx->iprefix + std::string(".emd"));
   if (!ifs.good()) {
-    SETERRQ(ctx->world_comm, EM_ERR_USER, string_format("Unable to open file %s.emd.", ctx->iprefix).c_str());
+    SETERRQ(ctx->world_comm, EM_ERR_USER, "%s", string_format("Unable to open file %s.emd.", ctx->iprefix).c_str());
   }
 
   while (std::getline(ifs, l)) {
