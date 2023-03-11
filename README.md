@@ -42,15 +42,15 @@ EMFEM uses several open source libraries, including:
 The easiest way to install the dependencies of EMFEM is using [spack](https://spack.io).
 All the dependencies can be installed with
 
-    $ spack install mpich metis tetgen eigen petsc+mumps+hypre+superlu-dist nanoflann
+    $ spack install mpi metis tetgen eigen petsc+mumps+hypre+superlu-dist nanoflann
 
 Building
 --------
 
 Once installed all the dependencies and unpacked the source code of EMFEM into a
-directory `/path/to/emfem/sources`. Then configure, compile emfem with
+directory `/path/to/emfem`. Then configure, compile emfem with
 
-    $ cd /path/to/emfem/sources
+    $ cd /path/to/emfem
     $ mkdir build
     $ cd build
     $ spack load mpi
@@ -62,19 +62,19 @@ directory `/path/to/emfem/sources`. Then configure, compile emfem with
             -DMETIS_DIR=$(spack location -i metis) ..
     $ make
 
-Note that EMFEM was only tested on Linux and macOS systems. For Windows users,
-we suggest to use WSL1/WSL2 or a virtual machine.
+Note that EMFEM has only been tested on Linux and macOS systems. For Windows users,
+we recommend using WSL1/WSL2 or a virtual machine.
 
 Usage
 -----
 
-To run the forward modeling process, the user need to provide three files, i.e.,
-the model file, the data template file and the configuration file. Then use the
-flowing command to run emfem
+To run the forward modeling process, the user needs to provide three files:
+the model file, the data template file, and the configuration file. Then use the
+flowing command to run emfem:
 
     $ mpirun -np <# of processes> ./emfem -options_file <configuration-file-name>
 
-For more details of the format of these files, please refer to the [documentation](https://emfem.ceqin.me).
+For more details on the format of these files, please refer to the [documentation](https://emfem.ceqin.me).
 
 License
 -------
@@ -85,7 +85,7 @@ for more details.
 Contributing
 ------------
 
-The users are encouraged to open an issue for questions or bugs. Pull requests for
+The users are encouraged to open an issue for any questions or bugs. Pull requests for
 any enhancement are also wellcomed.
 
 Authors
