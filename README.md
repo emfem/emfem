@@ -100,6 +100,10 @@ How to cite EMFEM?
 
 If you publish results made using EMFEM, please consider citing:
 
+    Ce Qin, Xuben Wang, Ning Zhao, 2023. EMFEM: A parallel 3D modeling code
+    for frequency-domain electromagnetic method using goal-oriented adaptive
+    finite element method. Computers & Geosciences, 178:105403. DOI:10.1016/j.cageo.2023.105403.
+
     QIN Ce, WANG XuBen, ZHAO Ning, 2020. Research on the iterative solver
     of linear equations in three-dimensional finite element forward modeling
     for frequency domain electromagnetic method[J].
