@@ -518,7 +518,7 @@ void Mesh::init_kd_tree() {
 }
 
 std::tuple<Point, int> Mesh::find_closest_vertex(const Point &p) {
-  size_t idx;
+  uint32_t idx;
   double dist;
 
   kd_index_->knnSearch(&p[0], 1, &idx, &dist);
