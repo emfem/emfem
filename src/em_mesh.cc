@@ -63,8 +63,6 @@ void Mesh::init_mesh() {
 }
 
 void Mesh::create(tetgenio *in) {
-  int i, t;
-
   assert(in != NULL);
 
   if (tio_ == in) {
@@ -101,7 +99,7 @@ void Mesh::copy(const Mesh &m) {
 }
 
 void Mesh::refine_tetgen(const std::vector<bool> &flag) {
-  int t, nt, i;
+  int t, nt;
   tetgenio* out;
 
   assert(((int)flag.size()) == n_tets());
@@ -448,7 +446,7 @@ void Mesh::build_vertex_info() {
 }
 
 void Mesh::build_edge_info() {
-  int i, j;
+  int i;
 
   for (i = 0; i < tio_->numberofedges; ++i) {
     if (tio_->edgelist[i * 2 + 0] > tio_->edgelist[i * 2 + 1]) {
@@ -518,7 +516,7 @@ void Mesh::init_kd_tree() {
 }
 
 std::tuple<Point, int> Mesh::find_closest_vertex(const Point &p) {
-  uint32_t idx;
+  size_t idx;
   double dist;
 
   kd_index_->knnSearch(&p[0], 1, &idx, &dist);

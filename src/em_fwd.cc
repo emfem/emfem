@@ -636,7 +636,7 @@ PetscErrorCode assemble_rhs_csem(EMContext *ctx, int fidx, int tidx) {
   PetscCall(VecZeroEntries(ctx->s.re));
   PetscCall(VecZeroEntries(ctx->s.im));
 
-  for (j = 0; j < dipoles.size(); ++j) {
+  for (j = 0; j < (int)dipoles.size(); ++j) {
     center = std::get<0>(dipoles[j]);
     direction = std::get<1>(dipoles[j]);
     current = std::get<2>(dipoles[j]);

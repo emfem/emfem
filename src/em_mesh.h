@@ -57,7 +57,7 @@ public:
   void save_vtk(const char *, const std::map<std::string, Eigen::VectorXd> &);
 
 public:
-  typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<double, Mesh>, Mesh, 3>
+  typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<double, Mesh>, Mesh, 3, size_t>
       KDTree;
 
   size_t kdtree_get_point_count() const { return (size_t)tio_->numberofpoints; }
